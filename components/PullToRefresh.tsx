@@ -10,6 +10,7 @@ import Animated, {
   Extrapolation,
   runOnJS,
   withRepeat,
+  Easing,
 } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import CircularProgress from './CircularProgress';
@@ -31,6 +32,7 @@ export default function PullToRefresh({
   const isLoaderActive = useSharedValue(false);
   const progress = useSharedValue(0);
   const rotation = useSharedValue(0);
+  const loaderOpacity = useSharedValue(1);
 
   const applyResistance = (distance: number): number => {
     'worklet';
@@ -44,11 +46,18 @@ export default function PullToRefresh({
     try {
       await onRefresh();
     } finally {
-      loaderOffsetY.value = withTiming(0);
-      isRefreshing.value = false;
-      isLoaderActive.value = false;
-      rotation.value = 0;
-      progress.value = withTiming(0, { duration: 200 });
+      // Fade out the loader
+      loaderOpacity.value = withTiming(0, { duration: 300 }, (finished) => {
+        if (finished) {
+          // After fade out completes, reset everything
+          loaderOffsetY.value = 0;
+          isRefreshing.value = false;
+          isLoaderActive.value = false;
+          rotation.value = 0;
+          progress.value = 0;
+          loaderOpacity.value = 1; // Reset for next time
+        }
+      });
     }
   };
 
@@ -88,9 +97,12 @@ export default function PullToRefresh({
         if (loaderOffsetY.value >= threshold) {
           isRefreshing.value = true;
 
-          // Start spinning
+          // Start spinning - slow and steady rotation
           rotation.value = withRepeat(
-            withTiming(360, { duration: 1000 }),
+            withTiming(360, {
+              duration: 1500,
+              easing: Easing.linear
+            }),
             -1,
             false
           );
@@ -109,16 +121,19 @@ export default function PullToRefresh({
     const indicatorSize = 24;
     const indicatorTop = loaderOffsetY.value - indicatorSize - 8;
 
+    // Calculate base opacity from pull distance
+    const pullOpacity = interpolate(
+      loaderOffsetY.value,
+      [0, 10],
+      [0, 1],
+      Extrapolation.CLAMP
+    );
+
     return {
       top: indicatorTop,
-      opacity: interpolate(
-        loaderOffsetY.value,
-        [0, 10],
-        [0, 1],
-        Extrapolation.CLAMP
-      ),
+      opacity: pullOpacity * loaderOpacity.value,
       transform: [
-        { rotate: isRefreshing.value ? `${rotation.value}deg` : '0deg' },
+        { rotate: `${rotation.value}deg` },
       ],
     };
   });
@@ -159,7 +174,7 @@ export default function PullToRefresh({
           loaderAnimation,
         ]}
       >
-        <CircularProgress progress={progress} />
+        <CircularProgress progress={progress} isRefreshing={isRefreshing} />
       </Animated.View>
 
       {/* Scrollable Content */}
