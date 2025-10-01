@@ -1,9 +1,11 @@
-import React from 'react';
-import { ScrollView } from 'react-native';
+import React, { useState } from 'react';
+import { View } from 'react-native';
+import Animated from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StackNavigationProp } from '@react-navigation/stack';
 import TopBar from '../components/TopBar';
 import PrayerDisplay from '../components/PrayerDisplay';
+import PullToRefresh from '../components/PullToRefresh';
 
 type RootStackParamList = {
   Main: undefined;
@@ -17,6 +19,8 @@ interface MainScreenProps {
 }
 
 export default function MainScreen({ navigation }: MainScreenProps) {
+  const [lastRefreshTime, setLastRefreshTime] = useState<Date>(new Date());
+
   const prayerData = {
     title: "2024년 교회 기도제목",
     sections: [
@@ -62,22 +66,38 @@ export default function MainScreen({ navigation }: MainScreenProps) {
     }
   };
 
+  const handleRefresh = async () => {
+    // Simulate 1 second server fetch
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
+    // Update refresh time to trigger re-render
+    setLastRefreshTime(new Date());
+
+    // TODO: Add actual server communication logic here
+    console.log('Data refreshed at:', new Date().toLocaleTimeString());
+  };
+
   const handleEditPress = () => {
     navigation.navigate('Edit');
   };
 
   return (
     <SafeAreaView className="flex-1 bg-white dark:bg-neutral-900">
-      <TopBar onEditPress={handleEditPress} />
-      <ScrollView
-        contentContainerStyle={{
-          paddingTop: 16,
-          paddingHorizontal: 24,
-          paddingBottom: 32,
-        }}
-      >
-        <PrayerDisplay {...prayerData} />
-      </ScrollView>
+      <View style={{ zIndex: 100, elevation: 100 }}>
+        <TopBar onEditPress={handleEditPress} />
+      </View>
+      <PullToRefresh onRefresh={handleRefresh} threshold={40}>
+        <Animated.ScrollView
+          contentContainerStyle={{
+            paddingTop: 16,
+            paddingHorizontal: 24,
+            paddingBottom: 32,
+          }}
+          showsVerticalScrollIndicator={true}
+        >
+          <PrayerDisplay {...prayerData} />
+        </Animated.ScrollView>
+      </PullToRefresh>
     </SafeAreaView>
   );
 }
