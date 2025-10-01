@@ -35,7 +35,7 @@ export default function PullToRefresh({
   const applyResistance = (distance: number): number => {
     'worklet';
     if (distance <= 0) return 0;
-    const resistanceFactor = 0.25;
+    const resistanceFactor = 0.16;
     const resistedDistance = threshold * Math.sqrt(distance / (threshold / resistanceFactor));
     return Math.min(resistedDistance, threshold);
   };
@@ -62,14 +62,19 @@ export default function PullToRefresh({
   const native = Gesture.Native();
 
   const panGesture = Gesture.Pan()
+    .onBegin(() => {
+      'worklet';
+      // Only activate loader if we're at the top when gesture begins
+      if (listContentOffsetY.value <= 0) {
+        isLoaderActive.value = true;
+      }
+    })
     .onUpdate((event) => {
       'worklet';
-      isLoaderActive.value = loaderOffsetY.value > 0;
-
-      // Only allow pull when at top and pulling down
+      // Only allow pull if loader is active and pulling down
       if (
-        ((listContentOffsetY.value <= 0 && event.translationY > 0) ||
-          isLoaderActive.value) &&
+        isLoaderActive.value &&
+        event.translationY > 0 &&
         !isRefreshing.value
       ) {
         const resistedDistance = applyResistance(event.translationY);
