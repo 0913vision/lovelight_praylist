@@ -147,7 +147,7 @@ export default function PrayerSectionEditor({
           }
         }}
       >
-        <View className="border border-gray-200 dark:border-neutral-700 rounded-lg p-4 bg-gray-50 dark:bg-neutral-800">
+        <View className="border border-gray-200 dark:border-neutral-700 rounded-lg p-4 bg-gray-100 dark:bg-neutral-800">
           {/* Section Name Input with Trash Icon */}
           <View className="flex-row items-center mb-3">
             <TextInput
@@ -155,7 +155,7 @@ export default function PrayerSectionEditor({
               onChangeText={updateSectionName}
               placeholder={`소제목 (필수) (예: 홍길동)`}
               className="flex-1 border border-gray-300 dark:border-neutral-600 rounded-lg px-3 py-2 text-gray-900 dark:text-white bg-white dark:bg-neutral-700"
-              placeholderTextColor="#9CA3AF"
+              placeholderTextColor="#6B7280"
               style={{ fontSize: fontSize * 0.14 }}
             />
             <TouchableOpacity

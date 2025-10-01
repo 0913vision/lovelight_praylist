@@ -45,7 +45,7 @@ export default function PrayerItemEditor({
           onChangeText={updateContent}
           placeholder={`${itemIndex}번째 기도제목`}
           className="border border-gray-300 dark:border-neutral-600 rounded-lg px-3 py-2 text-gray-900 dark:text-white bg-white dark:bg-neutral-700"
-          placeholderTextColor="#9CA3AF"
+          placeholderTextColor="#6B7280"
           style={{ fontSize: fontSize * 0.14 }}
           multiline
         />

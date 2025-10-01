@@ -26,7 +26,7 @@ export default function PrayerDisplay({ title, sections, verse }: PrayerDisplayP
       </Text>
 
       {sections.map((section, index) => (
-        <View key={index} className="space-y-3">
+        <View key={index} className="space-y-3 mt-6">
           <Text className="font-semibold text-gray-800 dark:text-gray-200" style={getFontSizeStyle()}>
             <Text className="font-bold">&lt;</Text>{section.name}<Text className="font-bold">&gt;</Text>
           </Text>
@@ -41,7 +41,7 @@ export default function PrayerDisplay({ title, sections, verse }: PrayerDisplayP
       ))}
 
       {verse && (
-        <View className="mt-12 pt-8 border-t border-gray-300/50 dark:border-gray-700">
+        <View className="mt-8 pt-8 border-t border-gray-300 dark:border-gray-700">
           <Text className="text-gray-600 dark:text-gray-400 italic mb-2" style={getVerseStyle()}>
             "{verse.text}"
           </Text>
