@@ -7,6 +7,7 @@ import {
   Platform,
   Alert,
   ScrollView,
+  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
@@ -39,6 +40,8 @@ export default function EditScreen({ navigation, initialData }: EditScreenProps)
   const [dummyHeight, setDummyHeight] = useState(0);
   const scrollViewRef = useRef<ScrollView>(null);
   const isAtBottomRef = useRef(false);
+  const [showExitModal, setShowExitModal] = useState(false);
+  const [hasChanges, setHasChanges] = useState(false);
 
   // 편집 모드 진입/나갈 때 음악 상태 관리
   useEffect(() => {
@@ -97,6 +100,7 @@ export default function EditScreen({ navigation, initialData }: EditScreenProps)
       ...prev,
       sections: [...prev.sections, newSection],
     }));
+    setHasChanges(true);
   };
 
   const handleDeleteStart = (height: number) => {
@@ -129,6 +133,7 @@ export default function EditScreen({ navigation, initialData }: EditScreenProps)
         section.id === sectionId ? updatedSection : section
       ),
     }));
+    setHasChanges(true);
   };
 
   const validateData = (): boolean => {
@@ -173,7 +178,20 @@ export default function EditScreen({ navigation, initialData }: EditScreenProps)
   };
 
   const handleCancel = () => {
+    if (hasChanges) {
+      setShowExitModal(true);
+    } else {
+      navigation.goBack();
+    }
+  };
+
+  const handleConfirmExit = () => {
+    setShowExitModal(false);
     navigation.goBack();
+  };
+
+  const handleCancelExit = () => {
+    setShowExitModal(false);
   };
 
   return (
@@ -294,6 +312,58 @@ export default function EditScreen({ navigation, initialData }: EditScreenProps)
         {/* Dummy spacer to maintain scroll position when deleting at bottom */}
         {dummyHeight > 0 && <View style={{ height: dummyHeight }} />}
       </KeyboardAwareScrollView>
+
+      {/* Exit Confirmation Modal */}
+      <Modal
+        visible={showExitModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={handleCancelExit}
+      >
+        <View className="flex-1 justify-center items-center bg-black/50">
+          <View className="bg-white dark:bg-neutral-800 rounded-2xl p-6 w-4/5 max-w-sm shadow-2xl">
+            <Text
+              className="text-gray-900 dark:text-white font-semibold mb-3 text-center"
+              style={{ fontSize: fontSize * 0.16 }}
+            >
+              편집 취소
+            </Text>
+            <Text
+              className="text-gray-600 dark:text-gray-400 mb-6 text-center"
+              style={{ fontSize: fontSize * 0.13 }}
+            >
+              작성 중인 내용이 모두 초기화됩니다.{'\n'}
+              정말 나가시겠습니까?
+            </Text>
+
+            <View className="flex-row gap-3">
+              <TouchableOpacity
+                onPress={handleCancelExit}
+                className="flex-1 bg-gray-200 dark:bg-neutral-700 rounded-lg py-3"
+              >
+                <Text
+                  className="text-gray-800 dark:text-gray-200 text-center font-medium"
+                  style={{ fontSize: fontSize * 0.14 }}
+                >
+                  계속 작성
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={handleConfirmExit}
+                className="flex-1 bg-red-500 dark:bg-red-600 rounded-lg py-3"
+              >
+                <Text
+                  className="text-white text-center font-semibold"
+                  style={{ fontSize: fontSize * 0.14 }}
+                >
+                  나가기
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
