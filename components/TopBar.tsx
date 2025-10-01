@@ -1,109 +1,139 @@
-import React, { useState, useRef } from 'react';
-import { View, TouchableOpacity, PanResponder, Animated } from 'react-native';
-import { Edit3, Sun, Moon, Volume2, VolumeX, Plus, Minus } from 'lucide-react-native';
+import React from 'react';
+import { View, TouchableOpacity, Alert, Platform } from 'react-native';
+import { Edit3, Sun, Moon, Volume2, VolumeX, Plus, Minus, LogOut } from 'lucide-react-native';
 import { useTheme } from '../hooks/useTheme';
 import { useFontSize } from '../contexts/FontSizeContext';
+import { useAuth } from '../hooks/useAuth';
+import { useAudio } from '../contexts/AudioContext';
 
-export default function TopBar() {
+interface TopBarProps {
+  onEditPress?: () => void;
+}
+
+export default function TopBar({ onEditPress }: TopBarProps) {
   const { isDarkMode, toggleTheme } = useTheme();
   const { fontSize, increaseFontSize, decreaseFontSize } = useFontSize();
-  const [isMuted, setIsMuted] = useState(false);
-  const [volume, setVolume] = useState(50);
-  const volumeRef = useRef(50);
-  const startVolumeRef = useRef(50);
+  const { user, signInWithKakao, signOut } = useAuth();
+  const { isPlaying, play, pause } = useAudio();
 
-  const toggleMute = () => {
-    setIsMuted(!isMuted);
+  const toggleMute = async () => {
+    if (isPlaying) {
+      await pause();
+    } else {
+      await play();
+    }
   };
 
-  // volume이 변경될 때마다 ref 업데이트
-  volumeRef.current = volume;
+  const showAlert = (title: string, message: string, buttons?: any[]) => {
+    if (Platform.OS === 'web') {
+      // 웹에서는 기본 브라우저 다이얼로그 사용
+      if (buttons && buttons.length > 1) {
+        const result = window.confirm(message);
+        if (result && buttons[1]?.onPress) {
+          buttons[1].onPress();
+        }
+      } else {
+        window.alert(message);
+      }
+    } else {
+      // 모바일에서는 React Native Alert 사용
+      Alert.alert(title, message, buttons);
+    }
+  };
 
-  const panResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
-      onPanResponderGrant: () => {
-        startVolumeRef.current = volumeRef.current;
-      },
-      onPanResponderMove: (evt, gestureState) => {
-        const deltaVolume = (gestureState.dx / 96) * 100;
-        const newVolume = Math.max(0, Math.min(100, startVolumeRef.current + deltaVolume));
-        volumeRef.current = newVolume;
-        setVolume(newVolume);
-      },
-    })
-  ).current;
+  const handleEditPress = async () => {
+    if (!user) {
+      showAlert(
+        '로그인 필요',
+        '기도제목을 편집하려면 로그인이 필요합니다. 카카오로 로그인하시겠습니까?',
+        [
+          { text: '취소', style: 'cancel' },
+          {
+            text: '카카오 로그인',
+            onPress: async () => {
+              const { error } = await signInWithKakao();
+              if (error) {
+                showAlert('로그인 오류', error.message);
+              }
+              // Success will be handled automatically by auth state change
+            }
+          }
+        ]
+      );
+    } else {
+      onEditPress?.();
+    }
+  };
+
 
   return (
     <View className="bg-white/95 dark:bg-neutral-900/90 backdrop-blur-xl border-b border-gray-200/50 dark:border-neutral-700/30 px-4 py-3">
-      <View className="flex-row justify-between items-center max-w-7xl mx-auto w-full">
-        <View className="flex-row items-center">
-          <TouchableOpacity className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-amber-800/20 transition-colors">
-            <Edit3 className="w-5 h-5" color={isDarkMode ? "#fcd34d" : "#4b5563"} />
+      <View className="flex-row justify-between items-center w-full">
+        <View className="flex-row items-center space-x-1">
+          <TouchableOpacity
+            onPress={handleEditPress}
+            className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-amber-800/20 transition-colors"
+          >
+            <Edit3 className="w-6 h-6" color={isDarkMode ? "#fcd34d" : "#4b5563"} />
           </TouchableOpacity>
+          {user && (
+            <TouchableOpacity
+              onPress={signOut}
+              className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-amber-800/20 transition-colors"
+            >
+              <LogOut className="w-6 h-6" color={isDarkMode ? "#fcd34d" : "#4b5563"} />
+            </TouchableOpacity>
+          )}
         </View>
 
         <View></View>
 
-        <View className="flex-row items-center space-x-2">
-          <View className="flex-row items-center space-x-1">
-            <TouchableOpacity
-              onPress={decreaseFontSize}
-              className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-amber-800/20 transition-colors disabled:opacity-50"
-              disabled={fontSize <= 80}
-            >
-              <Minus className="w-4 h-4" color={isDarkMode ? "#fcd34d" : "#4b5563"} />
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={increaseFontSize}
-              className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-amber-800/20 transition-colors disabled:opacity-50"
-              disabled={fontSize >= 200}
-            >
-              <Plus className="w-4 h-4" color={isDarkMode ? "#fcd34d" : "#4b5563"} />
-            </TouchableOpacity>
-          </View>
+        <View className="flex-row items-center space-x-1">
+          <TouchableOpacity
+            onPress={decreaseFontSize}
+            className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-amber-800/20 transition-colors disabled:opacity-50"
+            disabled={fontSize <= 80}
+          >
+            <Minus className="w-5 h-5" color={isDarkMode ? "#fcd34d" : "#4b5563"} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={increaseFontSize}
+            className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-amber-800/20 transition-colors disabled:opacity-50"
+            disabled={fontSize >= 200}
+          >
+            <Plus className="w-5 h-5" color={isDarkMode ? "#fcd34d" : "#4b5563"} />
+          </TouchableOpacity>
 
-          <View className="flex-row items-center space-x-2">
-            <TouchableOpacity
-              onPress={toggleMute}
-              className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-amber-800/20 transition-colors"
-            >
-              {isMuted ? (
-                <VolumeX
-                  className="w-5 h-5"
-                  color={isDarkMode ? "#fcd34d" : "#4b5563"} // dark:text-amber-300 / text-gray-600
-                />
-              ) : (
-                <Volume2
-                  className="w-5 h-5"
-                  color={isDarkMode ? "#fcd34d" : "#4b5563"} // dark:text-amber-300 / text-gray-600
-                />
-              )}
-            </TouchableOpacity>
-            <View className="relative" {...panResponder.panHandlers}>
-              <View className="w-24 h-2 bg-gray-200 dark:bg-neutral-700 rounded-lg">
-                <View
-                  className="h-full bg-gray-500 dark:bg-amber-400 rounded-lg"
-                  style={{ width: `${isMuted ? 0 : volume}%` }}
-                />
-              </View>
-            </View>
-          </View>
+          <TouchableOpacity
+            onPress={toggleMute}
+            className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-amber-800/20 transition-colors"
+          >
+            {!isPlaying ? (
+              <VolumeX
+                className="w-6 h-6"
+                color={isDarkMode ? "#fcd34d" : "#4b5563"}
+              />
+            ) : (
+              <Volume2
+                className="w-6 h-6"
+                color={isDarkMode ? "#fcd34d" : "#4b5563"}
+              />
+            )}
+          </TouchableOpacity>
 
           <TouchableOpacity
             onPress={toggleTheme}
-            className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-amber-800/20 transition-colors"
+            className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-amber-800/20 transition-colors"
           >
             {isDarkMode ? (
               <Sun
-                className="w-5 h-5"
-                color={isDarkMode ? "#fcd34d" : "#4b5563"} // dark:text-amber-300 / text-gray-600
+                className="w-6 h-6"
+                color={isDarkMode ? "#fcd34d" : "#4b5563"}
               />
             ) : (
               <Moon
-                className="w-5 h-5"
-                color={isDarkMode ? "#fcd34d" : "#4b5563"} // dark:text-amber-300 / text-gray-600
+                className="w-6 h-6"
+                color={isDarkMode ? "#fcd34d" : "#4b5563"}
               />
             )}
           </TouchableOpacity>
