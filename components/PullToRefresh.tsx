@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { forwardRef, useImperativeHandle } from 'react';
 import { NativeScrollEvent, NativeSyntheticEvent } from 'react-native';
 import Animated, {
   useSharedValue,
@@ -21,11 +21,15 @@ interface PullToRefreshProps {
   threshold?: number;
 }
 
-export default function PullToRefresh({
+export interface PullToRefreshRef {
+  triggerRefresh: () => void;
+}
+
+const PullToRefresh = forwardRef<PullToRefreshRef, PullToRefreshProps>(({
   onRefresh,
   children,
   threshold = 40,
-}: PullToRefreshProps) {
+}, ref) => {
   const isRefreshing = useSharedValue(false);
   const loaderOffsetY = useSharedValue(0);
   const listContentOffsetY = useSharedValue(0);
@@ -60,6 +64,30 @@ export default function PullToRefresh({
       });
     }
   };
+
+  // Expose triggerRefresh method via ref
+  useImperativeHandle(ref, () => ({
+    triggerRefresh: () => {
+      if (!isRefreshing.value) {
+        isRefreshing.value = true;
+        isLoaderActive.value = true;
+        loaderOffsetY.value = threshold;
+        progress.value = 1;
+
+        // Start spinning
+        rotation.value = withRepeat(
+          withTiming(360, {
+            duration: 1500,
+            easing: Easing.linear
+          }),
+          -1,
+          false
+        );
+
+        performRefresh();
+      }
+    }
+  }), [threshold]);
 
   const onScroll = useAnimatedScrollHandler({
     onScroll: (event) => {
@@ -191,4 +219,6 @@ export default function PullToRefresh({
       </GestureDetector>
     </Animated.View>
   );
-}
+});
+
+export default PullToRefresh;

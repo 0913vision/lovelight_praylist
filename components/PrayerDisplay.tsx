@@ -40,7 +40,8 @@ export default function PrayerDisplay({ title, sections, verse }: PrayerDisplayP
         </View>
       ))}
 
-      {verse && (
+      {/* TODO(0913vision): Add verse input field in EditScreen and uncomment this section to enable Bible verse display */}
+      {/* {verse && (
         <View className="mt-8 pt-8 border-t border-gray-300 dark:border-gray-700">
           <Text className="text-gray-600 dark:text-gray-400 italic mb-2" style={getVerseStyle()}>
             "{verse.text}"
@@ -49,7 +50,7 @@ export default function PrayerDisplay({ title, sections, verse }: PrayerDisplayP
             — {verse.reference}
           </Text>
         </View>
-      )}
+      )} */}
     </View>
   );
 }

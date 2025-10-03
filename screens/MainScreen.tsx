@@ -1,11 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { View } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StackNavigationProp } from '@react-navigation/stack';
+import Toast from 'react-native-toast-message';
 import TopBar from '../components/TopBar';
 import PrayerDisplay from '../components/PrayerDisplay';
-import PullToRefresh from '../components/PullToRefresh';
+import PullToRefresh, { PullToRefreshRef } from '../components/PullToRefresh';
+import { usePrayers, PrayerData } from '../hooks/usePrayers';
 
 type RootStackParamList = {
   Main: undefined;
@@ -19,62 +21,50 @@ interface MainScreenProps {
 }
 
 export default function MainScreen({ navigation }: MainScreenProps) {
-  const [lastRefreshTime, setLastRefreshTime] = useState<Date>(new Date());
+  const { fetchLatestPrayer, loadCachedData } = usePrayers();
+  const [prayerData, setPrayerData] = useState<PrayerData | null>(null);
+  const pullToRefreshRef = useRef<PullToRefreshRef>(null);
 
-  const prayerData = {
-    title: "2024년 교회 기도제목",
-    sections: [
-      {
-        name: "목회진",
-        items: [
-          "담임목사님의 건강과 지혜",
-          "부목사님들의 사역과 성장",
-          "전도사님들의 헌신과 열정"
-        ]
-      },
-      {
-        name: "교회 부흥",
-        items: [
-          "새신자들의 지속적인 정착",
-          "성도들의 영적 성장",
-          "말씀에 대한 갈급함",
-          "기도하는 교회"
-        ]
-      },
-      {
-        name: "선교",
-        items: [
-          "해외 선교사님들의 건강과 안전",
-          "현지 사역의 열매",
-          "선교지 개척과 교회 설립",
-          "재정적 필요 공급"
-        ]
-      },
-      {
-        name: "청년부",
-        items: [
-          "청년들의 신앙 회복",
-          "세상의 유혹을 이기는 힘",
-          "진로와 취업에 대한 인도",
-          "다음 세대 리더십 양성"
-        ]
+  // 초기 데이터 로드 - 캐시 먼저, 그 다음 서버 데이터
+  useEffect(() => {
+    const initializeData = async () => {
+      // 1. 캐시된 데이터 먼저 로드 (즉시 표시)
+      const cachedData = await loadCachedData();
+      if (cachedData) {
+        setPrayerData(cachedData);
       }
-    ],
-    verse: {
-      text: "너희가 내 이름으로 무엇을 구하든지 내가 행하리니 이는 아버지로 하여금 아들로 말미암아 영광을 받으시게 하려 함이라",
-      reference: "요한복음 14:13"
+
+      // 2. 약간의 딜레이 후 서버에서 최신 데이터 가져오기
+      setTimeout(() => {
+        pullToRefreshRef.current?.triggerRefresh();
+      }, 100);
+    };
+
+    initializeData();
+  }, [loadCachedData]);
+
+  const loadPrayerData = async () => {
+    const data = await fetchLatestPrayer();
+    if (data) {
+      setPrayerData(data);
+      Toast.show({
+        type: 'success',
+        text1: '최신 기도제목을 불러왔습니다',
+        position: 'bottom',
+        visibilityTime: 2000,
+      });
+    } else {
+      Toast.show({
+        type: 'error',
+        text1: '기도제목을 불러오는데 실패했습니다',
+        position: 'bottom',
+        visibilityTime: 3000,
+      });
     }
   };
 
   const handleRefresh = async () => {
-    // Simulate 1 second server fetch
-    await new Promise(resolve => setTimeout(resolve, 1000));
-
-    // Update refresh time to trigger re-render
-    setLastRefreshTime(new Date());
-
-    // TODO: Add actual server communication logic here
-    console.log('Data refreshed at:', new Date().toLocaleTimeString());
+    await loadPrayerData();
   };
 
   const handleEditPress = () => {
@@ -86,7 +76,7 @@ export default function MainScreen({ navigation }: MainScreenProps) {
       <View style={{ zIndex: 100, elevation: 100 }}>
         <TopBar onEditPress={handleEditPress} />
       </View>
-      <PullToRefresh onRefresh={handleRefresh} threshold={40}>
+      <PullToRefresh ref={pullToRefreshRef} onRefresh={handleRefresh} threshold={40}>
         <Animated.ScrollView
           contentContainerStyle={{
             paddingTop: 16,
@@ -95,7 +85,7 @@ export default function MainScreen({ navigation }: MainScreenProps) {
           }}
           showsVerticalScrollIndicator={true}
         >
-          <PrayerDisplay {...prayerData} />
+          {prayerData && <PrayerDisplay {...prayerData} />}
         </Animated.ScrollView>
       </PullToRefresh>
     </SafeAreaView>

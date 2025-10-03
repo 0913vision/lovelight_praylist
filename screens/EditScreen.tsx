@@ -8,14 +8,17 @@ import {
   Alert,
   ScrollView,
   Modal,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { ChevronLeft, Check } from 'lucide-react-native';
+import Toast from 'react-native-toast-message';
 import { useAudio } from '../contexts/AudioContext';
 import { useFontSize } from '../contexts/FontSizeContext';
 import { useTheme } from '../hooks/useTheme';
+import { usePrayers, PrayerData } from '../hooks/usePrayers';
 import { EditablePrayerData, EditablePrayerSection, EditablePrayerItem } from '../types';
 import PrayerSectionEditor from '../components/PrayerSectionEditor';
 import DateSelector from '../components/DateSelector';
@@ -36,11 +39,14 @@ export default function EditScreen({ navigation, initialData }: EditScreenProps)
   const { isPlaying, pause, play } = useAudio();
   const { fontSize } = useFontSize();
   const { isDarkMode } = useTheme();
+  const { uploadPrayer, loading } = usePrayers();
   const [scrollEnabled, setScrollEnabled] = useState(true);
   const [dummyHeight, setDummyHeight] = useState(0);
   const scrollViewRef = useRef<ScrollView>(null);
   const isAtBottomRef = useRef(false);
   const [showExitModal, setShowExitModal] = useState(false);
+  const [showSaveModal, setShowSaveModal] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
 
   // 편집 모드 진입/나갈 때 음악 상태 관리
@@ -137,25 +143,20 @@ export default function EditScreen({ navigation, initialData }: EditScreenProps)
   };
 
   const validateData = (): boolean => {
-    if (!prayerData.title.trim()) {
-      Alert.alert('오류', '기도제목 제목을 입력해주세요.');
-      return false;
-    }
-
     if (prayerData.sections.length === 0) {
-      Alert.alert('오류', '최소 하나의 기도제목소단위를 추가해주세요.');
+      Alert.alert('오류', '최소 하나의 기도제목 섹션을 추가해주세요.');
       return false;
     }
 
     for (const section of prayerData.sections) {
       if (!section.name.trim()) {
-        Alert.alert('오류', '모든 소제목을 입력해주세요.');
+        Alert.alert('오류', '모든 섹션 제목을 입력해주세요.');
         return false;
       }
 
       const validItems = section.items.filter(item => item.content.trim());
       if (validItems.length === 0) {
-        Alert.alert('오류', `"${section.name}" 소제목에 최소 하나의 기도제목을 입력해주세요.`);
+        Alert.alert('오류', `"${section.name}" 섹션에 최소 하나의 기도제목을 입력해주세요.`);
         return false;
       }
     }
@@ -165,6 +166,11 @@ export default function EditScreen({ navigation, initialData }: EditScreenProps)
 
   const handleSave = () => {
     if (!validateData()) return;
+    setShowSaveModal(true);
+  };
+
+  const handleConfirmSave = async () => {
+    setIsSaving(true);
 
     const cleanedData: EditablePrayerData = {
       ...prayerData,
@@ -174,7 +180,48 @@ export default function EditScreen({ navigation, initialData }: EditScreenProps)
       })),
     };
 
-    navigation.goBack();
+    // 날짜 기반 제목 자동 생성 (예: "기도제목(2025.10.03)")
+    const formattedDate = prayerData.date.replace(/-/g, '.');
+    const autoTitle = `기도제목(${formattedDate})`;
+
+    // EditablePrayerData를 PrayerData 형식으로 변환
+    const prayerDataToUpload: PrayerData = {
+      title: autoTitle,
+      sections: cleanedData.sections.map(section => ({
+        name: section.name,
+        items: section.items.map(item => item.content),
+      })),
+      // TODO(0913vision): Add verse input fields (text and reference) in EditScreen UI
+      verse: {
+        text: '',
+        reference: '',
+      },
+    };
+
+    // DB에 업로드
+    const success = await uploadPrayer(prayerDataToUpload);
+
+    setIsSaving(false);
+    setShowSaveModal(false);
+
+    if (success) {
+      Toast.show({
+        type: 'success',
+        text1: '기도제목이 저장되었습니다',
+        position: 'bottom',
+        visibilityTime: 2000,
+      });
+      setTimeout(() => {
+        navigation.goBack();
+      }, 500);
+    } else {
+      Toast.show({
+        type: 'error',
+        text1: '저장에 실패했습니다',
+        position: 'bottom',
+        visibilityTime: 3000,
+      });
+    }
   };
 
   const handleCancel = () => {
@@ -312,6 +359,73 @@ export default function EditScreen({ navigation, initialData }: EditScreenProps)
         {/* Dummy spacer to maintain scroll position when deleting at bottom */}
         {dummyHeight > 0 && <View style={{ height: dummyHeight }} />}
       </KeyboardAwareScrollView>
+
+      {/* Save Confirmation Modal */}
+      <Modal
+        visible={showSaveModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => !isSaving && setShowSaveModal(false)}
+      >
+        <View className="flex-1 justify-center items-center bg-black/50">
+          <View className="bg-white dark:bg-neutral-800 rounded-2xl p-6 w-4/5 max-w-sm shadow-2xl">
+            {isSaving ? (
+              <>
+                <Text
+                  className="text-gray-900 dark:text-white font-semibold mb-4 text-center"
+                  style={{ fontSize: fontSize * 0.16 }}
+                >
+                  저장 중...
+                </Text>
+                <View className="items-center py-4">
+                  <ActivityIndicator size="large" color={isDarkMode ? '#3b82f6' : '#2563eb'} />
+                </View>
+              </>
+            ) : (
+              <>
+                <Text
+                  className="text-gray-900 dark:text-white font-semibold mb-3 text-center"
+                  style={{ fontSize: fontSize * 0.16 }}
+                >
+                  기도제목 저장
+                </Text>
+                <Text
+                  className="text-gray-600 dark:text-gray-400 mb-6 text-center"
+                  style={{ fontSize: fontSize * 0.13 }}
+                >
+                  작성한 기도제목을 저장하시겠습니까?
+                </Text>
+
+                <View className="flex-row gap-3">
+                  <TouchableOpacity
+                    onPress={() => setShowSaveModal(false)}
+                    className="flex-1 bg-gray-200 dark:bg-neutral-700 rounded-lg py-3"
+                  >
+                    <Text
+                      className="text-gray-800 dark:text-gray-200 text-center font-medium"
+                      style={{ fontSize: fontSize * 0.14 }}
+                    >
+                      취소
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    onPress={handleConfirmSave}
+                    className="flex-1 bg-blue-500 dark:bg-blue-600 rounded-lg py-3"
+                  >
+                    <Text
+                      className="text-white text-center font-semibold"
+                      style={{ fontSize: fontSize * 0.14 }}
+                    >
+                      저장
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
+          </View>
+        </View>
+      </Modal>
 
       {/* Exit Confirmation Modal */}
       <Modal
