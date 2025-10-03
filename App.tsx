@@ -6,13 +6,14 @@ import { createStackNavigator } from '@react-navigation/stack';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 import Toast from 'react-native-toast-message';
-import { useColorScheme } from 'nativewind';
 import { FontSizeProvider } from './contexts/FontSizeContext';
 import { AudioProvider } from './contexts/AudioContext';
 import { useVersionCheck } from './hooks/useVersionCheck';
+import { useTheme } from './hooks/useTheme';
 import MainScreen from './screens/MainScreen';
 import EditScreen from './screens/EditScreen';
 import UpdateRequiredScreen from './screens/UpdateRequiredScreen';
+import LoadingScreen from './components/LoadingScreen';
 import { Colors, getThemeColor } from './constants/Colors';
 import './global.css';
 
@@ -24,19 +25,18 @@ export type RootStackParamList = {
 const Stack = createStackNavigator<RootStackParamList>();
 
 function ThemedStatusBar() {
-  const { colorScheme } = useColorScheme();
+  const { isDarkMode } = useTheme();
 
   return (
     <StatusBar
-      style={colorScheme === 'dark' ? 'light' : 'dark'}
-      backgroundColor={getThemeColor(Colors.background, colorScheme === 'dark')}
+      style={isDarkMode ? 'light' : 'dark'}
+      backgroundColor={getThemeColor(Colors.background, isDarkMode)}
     />
   );
 }
 
 export default function App() {
   const { isUpdateRequired, isChecking, currentVersion, minVersion } = useVersionCheck();
-  const { colorScheme } = useColorScheme();
 
   return (
     <SafeAreaProvider>
@@ -45,13 +45,8 @@ export default function App() {
           <ThemedStatusBar />
           {isChecking ? (
             // 버전 체크 중 로딩 화면
-            <View className="flex-1 justify-center items-center">
-              <ActivityIndicator size="large" color={getThemeColor(Colors.primary, colorScheme === 'dark')} />
-              <Text style={{ fontSize: 22 }} className="mt-4 text-neutral-600 dark:text-neutral-400">
-                앱을 시작하는 중...
-              </Text>
-            </View>
-          ) : isUpdateRequired ? (
+            <LoadingScreen />
+          ) : true || isUpdateRequired ? (
             // 업데이트 필수 화면
             <UpdateRequiredScreen
               currentVersion={currentVersion}

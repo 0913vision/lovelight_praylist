@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, Linking, TouchableOpacity, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useColorScheme } from 'nativewind';
+import { useTheme } from '../hooks/useTheme';
 import { Colors, getThemeColor } from '../constants/Colors';
 
 interface UpdateRequiredScreenProps {
@@ -13,8 +13,7 @@ export default function UpdateRequiredScreen({
   currentVersion,
   minVersion
 }: UpdateRequiredScreenProps) {
-  const { colorScheme } = useColorScheme();
-  const isDarkMode = colorScheme === 'dark';
+  const { isDarkMode } = useTheme();
 
   const handleUpdatePress = () => {
     const storeUrl = Platform.OS === 'android'
@@ -53,7 +52,7 @@ export default function UpdateRequiredScreen({
             </Text>
           </View>
           <View className="flex-row justify-between">
-            <Text style={{ fontSize: 20 }} className="text-neutral-600 dark:text-neutral-400">최소 요구 버전</Text>
+            <Text style={{ fontSize: 20 }} className="text-neutral-600 dark:text-neutral-400">최신 버전</Text>
             <Text style={{ fontSize: 20 }} className="font-semibold text-neutral-900 dark:text-white">
               v{minVersion}
             </Text>

@@ -110,12 +110,12 @@ export const Colors = {
 /**
  * Helper function to get color based on theme
  * @param colorPath - Path to the color object (e.g., Colors.primary)
- * @param isDark - Whether dark mode is active
+ * @param isDarkMode - Whether dark mode is active
  * @returns Appropriate color for the current theme
  */
 export const getThemeColor = (
   colorPath: { light: string; dark: string },
-  isDark: boolean
+  isDarkMode: boolean
 ): string => {
-  return isDark ? colorPath.dark : colorPath.light;
+  return isDarkMode ? colorPath.dark : colorPath.light;
 };
