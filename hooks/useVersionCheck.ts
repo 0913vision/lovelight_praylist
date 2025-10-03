@@ -25,6 +25,13 @@ export function useVersionCheck() {
     try {
       setIsChecking(true);
 
+      // 웹 플랫폼에서는 버전 체크 비활성화
+      if (Platform.OS === 'web') {
+        setIsUpdateRequired(false);
+        setIsChecking(false);
+        return;
+      }
+
       // 현재 앱의 버전 정보 가져오기
       const appVersion = Constants.expoConfig?.version || '1.0.0';
       const versionCode = Platform.OS === 'android'
@@ -57,7 +64,7 @@ export function useVersionCheck() {
         setMinVersionCode(data.min_version_code);
 
         // 현재 버전 코드가 최소 요구 버전 코드보다 낮으면 업데이트 필요
-        if (true || currentCode < data.min_version_code) {
+        if (currentCode < data.min_version_code) {
           setIsUpdateRequired(true);
         } else {
           setIsUpdateRequired(false);
