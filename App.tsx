@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text } from 'react-native';
+import { View, Text, ActivityIndicator } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
@@ -9,8 +9,10 @@ import Toast from 'react-native-toast-message';
 import { useColorScheme } from 'nativewind';
 import { FontSizeProvider } from './contexts/FontSizeContext';
 import { AudioProvider } from './contexts/AudioContext';
+import { useVersionCheck } from './hooks/useVersionCheck';
 import MainScreen from './screens/MainScreen';
 import EditScreen from './screens/EditScreen';
+import UpdateRequiredScreen from './screens/UpdateRequiredScreen';
 import './global.css';
 
 export type RootStackParamList = {
@@ -32,31 +34,51 @@ function ThemedStatusBar() {
 }
 
 export default function App() {
+  const { isUpdateRequired, isChecking, currentVersion, minVersion } = useVersionCheck();
+  const { colorScheme } = useColorScheme();
+
   return (
     <SafeAreaProvider>
       <KeyboardProvider>
         <View className="flex-1 bg-white dark:bg-neutral-900">
           <ThemedStatusBar />
-          <NavigationContainer>
-            <AudioProvider>
-              <FontSizeProvider>
-                <Stack.Navigator
-                  screenOptions={{
-                    headerShown: false,
-                  }}
-                >
-                  <Stack.Screen name="Main" component={MainScreen} />
-                  <Stack.Screen
-                    name="Edit"
-                    component={EditScreen}
-                    options={{
-                      presentation: 'modal',
+          {isChecking ? (
+            // 버전 체크 중 로딩 화면
+            <View className="flex-1 justify-center items-center">
+              <ActivityIndicator size="large" color={colorScheme === 'dark' ? '#fcd34d' : '#4b5563'} />
+              <Text style={{ fontSize: 22 }} className="mt-4 text-neutral-600 dark:text-neutral-400">
+                앱을 시작하는 중...
+              </Text>
+            </View>
+          ) : isUpdateRequired ? (
+            // 업데이트 필수 화면
+            <UpdateRequiredScreen
+              currentVersion={currentVersion}
+              minVersion={minVersion}
+            />
+          ) : (
+            // 정상 앱 화면
+            <NavigationContainer>
+              <AudioProvider>
+                <FontSizeProvider>
+                  <Stack.Navigator
+                    screenOptions={{
+                      headerShown: false,
                     }}
-                  />
-                </Stack.Navigator>
-              </FontSizeProvider>
-            </AudioProvider>
-          </NavigationContainer>
+                  >
+                    <Stack.Screen name="Main" component={MainScreen} />
+                    <Stack.Screen
+                      name="Edit"
+                      component={EditScreen}
+                      options={{
+                        presentation: 'modal',
+                      }}
+                    />
+                  </Stack.Navigator>
+                </FontSizeProvider>
+              </AudioProvider>
+            </NavigationContainer>
+          )}
           <Toast
             config={{
               success: ({ text1 }) => (

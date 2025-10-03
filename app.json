@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "pray_list_web",
-    "slug": "pray_list_web",
+    "name": "사랑의빛교회 기도제목",
+    "slug": "prayerlist",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -23,7 +23,8 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.anonymous.pray_list_web"
+      "package": "com.lovelight.praylist",
+      "versionCode": 1
     },
     "web": {
       "favicon": "./assets/favicon.png"
