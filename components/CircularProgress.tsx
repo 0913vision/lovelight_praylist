@@ -8,8 +8,8 @@ import { Colors, getThemeColor } from '../constants/Colors';
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
 interface CircularProgressProps {
-  progress: SharedValue<number>; // 0 to 1
-  isRefreshing: SharedValue<boolean>; // NEW: Show dashed circle when loading
+  progress: SharedValue<number> | number; // 0 to 1
+  isRefreshing: SharedValue<boolean> | boolean; // NEW: Show dashed circle when loading
   size?: number;
   strokeWidth?: number;
   color?: string;
@@ -37,8 +37,13 @@ export default function CircularProgress({
   const gapLength = 8;
   const dashPattern = `${dashLength} ${gapLength}`;
 
+  const isSharedValue = typeof progress === 'object' && 'value' in progress;
+
   const animatedProps = useAnimatedProps(() => {
-    if (isRefreshing.value) {
+    const refreshing = isSharedValue ? (isRefreshing as SharedValue<boolean>).value : isRefreshing as boolean;
+    const progressValue = isSharedValue ? (progress as SharedValue<number>).value : progress as number;
+
+    if (refreshing) {
       // When loading, show full dashed circle (no offset)
       return {
         strokeDashoffset: 0,
@@ -46,7 +51,7 @@ export default function CircularProgress({
       };
     } else {
       // When pulling, show progress
-      const strokeDashoffset = circumference * (1 - progress.value);
+      const strokeDashoffset = circumference * (1 - progressValue);
       return {
         strokeDashoffset,
         strokeDasharray: `${circumference}`,
@@ -55,8 +60,9 @@ export default function CircularProgress({
   });
 
   const backgroundAnimatedProps = useAnimatedProps(() => {
+    const refreshing = isSharedValue ? (isRefreshing as SharedValue<boolean>).value : isRefreshing as boolean;
     return {
-      opacity: isRefreshing.value ? 0 : 1,
+      opacity: refreshing ? 0 : 1,
     };
   });
 

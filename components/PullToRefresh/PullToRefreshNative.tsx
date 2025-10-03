@@ -13,7 +13,7 @@ import Animated, {
   Easing,
 } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import CircularProgress from './CircularProgress';
+import CircularProgress from '../CircularProgress';
 
 interface PullToRefreshProps {
   onRefresh: () => Promise<void>;
@@ -222,3 +222,4 @@ const PullToRefresh = forwardRef<PullToRefreshRef, PullToRefreshProps>(({
 });
 
 export default PullToRefresh;
+export type { PullToRefreshRef };

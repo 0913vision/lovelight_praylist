@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, DeviceEventEmitter } from 'react-native';
+import { View, DeviceEventEmitter, Platform } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -80,8 +80,16 @@ export default function MainScreen({ navigation }: MainScreenProps) {
     navigation.navigate('Edit');
   };
 
+  const Container = Platform.OS === 'web' ? View : SafeAreaView;
+  const containerClassName = Platform.OS === 'web'
+    ? "bg-white dark:bg-neutral-900"
+    : "flex-1 bg-white dark:bg-neutral-900";
+  const containerStyle = Platform.OS === 'web'
+    ? { height: '100dvh' as any, display: 'flex' as const, flexDirection: 'column' as const }
+    : undefined;
+
   return (
-    <SafeAreaView className="flex-1 bg-white dark:bg-neutral-900">
+    <Container className={containerClassName} style={containerStyle}>
       <View style={{ zIndex: 100, elevation: 100 }}>
         <TopBar onEditPress={handleEditPress} />
       </View>
@@ -97,6 +105,6 @@ export default function MainScreen({ navigation }: MainScreenProps) {
           {prayerData && <PrayerDisplay {...prayerData} />}
         </Animated.ScrollView>
       </PullToRefresh>
-    </SafeAreaView>
+    </Container>
   );
 }
