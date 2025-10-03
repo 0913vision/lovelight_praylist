@@ -17,13 +17,13 @@ export default function UpdateRequiredScreen({
 
   const handleUpdatePress = () => {
     const storeUrl = Platform.OS === 'android'
-      ? 'market://details?id=com.lovelight.praylist' // Google Play Store
+      ? 'market://details?id=com.lovelight.prayerlist' // Google Play Store
       : 'https://apps.apple.com/app/idYOUR_APP_ID'; // App Store (앱 등록 후 ID 변경 필요)
 
     Linking.openURL(storeUrl).catch(() => {
       // 스토어 앱이 없으면 웹 브라우저로 열기
       const webUrl = Platform.OS === 'android'
-        ? 'https://play.google.com/store/apps/details?id=com.lovelight.praylist'
+        ? 'https://play.google.com/store/apps/details?id=com.lovelight.prayerlist'
         : 'https://apps.apple.com/app/idYOUR_APP_ID';
 
       Linking.openURL(webUrl);
