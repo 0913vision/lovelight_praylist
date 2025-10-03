@@ -13,6 +13,7 @@ import { useVersionCheck } from './hooks/useVersionCheck';
 import MainScreen from './screens/MainScreen';
 import EditScreen from './screens/EditScreen';
 import UpdateRequiredScreen from './screens/UpdateRequiredScreen';
+import { Colors, getThemeColor } from './constants/Colors';
 import './global.css';
 
 export type RootStackParamList = {
@@ -28,7 +29,7 @@ function ThemedStatusBar() {
   return (
     <StatusBar
       style={colorScheme === 'dark' ? 'light' : 'dark'}
-      backgroundColor={colorScheme === 'dark' ? '#171717' : '#ffffff'}
+      backgroundColor={getThemeColor(Colors.background, colorScheme === 'dark')}
     />
   );
 }
@@ -45,7 +46,7 @@ export default function App() {
           {isChecking ? (
             // 버전 체크 중 로딩 화면
             <View className="flex-1 justify-center items-center">
-              <ActivityIndicator size="large" color={colorScheme === 'dark' ? '#fcd34d' : '#4b5563'} />
+              <ActivityIndicator size="large" color={getThemeColor(Colors.primary, colorScheme === 'dark')} />
               <Text style={{ fontSize: 22 }} className="mt-4 text-neutral-600 dark:text-neutral-400">
                 앱을 시작하는 중...
               </Text>
@@ -91,7 +92,7 @@ export default function App() {
                     marginHorizontal: 20,
                   }}
                 >
-                  <Text style={{ color: '#fff', fontSize: 14 }}>
+                  <Text style={{ color: Colors.text.primary.dark, fontSize: 14 }}>
                     {text1}
                   </Text>
                 </View>
@@ -106,7 +107,7 @@ export default function App() {
                     marginHorizontal: 20,
                   }}
                 >
-                  <Text style={{ color: '#fff', fontSize: 14 }}>
+                  <Text style={{ color: Colors.text.primary.dark, fontSize: 14 }}>
                     {text1}
                   </Text>
                 </View>

@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, Linking, TouchableOpacity, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useColorScheme } from 'nativewind';
+import { Colors, getThemeColor } from '../constants/Colors';
 
 interface UpdateRequiredScreenProps {
   currentVersion: string;
@@ -62,10 +63,10 @@ export default function UpdateRequiredScreen({
         <TouchableOpacity
           onPress={handleUpdatePress}
           className="rounded-lg px-4 py-3"
-          style={{ backgroundColor: isDarkMode ? '#fcd34d' : '#d4d4d4ff' }}
+          style={{ backgroundColor: getThemeColor(Colors.button.update, isDarkMode) }}
           activeOpacity={0.7}
         >
-          <Text style={{ fontSize: 18, color: '#000000' }} className="text-center font-semibold">
+          <Text style={{ fontSize: 18, color: Colors.text.primary.light }} className="text-center font-semibold">
             {Platform.OS === 'android' ? 'Play 스토어에서 업데이트' : 'App Store에서 업데이트'}
           </Text>
         </TouchableOpacity>

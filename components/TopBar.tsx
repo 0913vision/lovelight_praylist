@@ -5,6 +5,7 @@ import { useTheme } from '../hooks/useTheme';
 import { useFontSize } from '../contexts/FontSizeContext';
 import { useAuth } from '../hooks/useAuth';
 import { useAudio } from '../contexts/AudioContext';
+import { Colors, getThemeColor } from '../constants/Colors';
 
 interface TopBarProps {
   onEditPress?: () => void;
@@ -66,6 +67,8 @@ export default function TopBar({ onEditPress }: TopBarProps) {
   };
 
 
+  const iconColor = getThemeColor(Colors.primary, isDarkMode);
+
   return (
     <View className="bg-white/95 dark:bg-neutral-900/90 backdrop-blur-xl border-b border-gray-200/50 dark:border-neutral-700/30 px-4 py-3">
       <View className="flex-row justify-between items-center w-full">
@@ -74,14 +77,14 @@ export default function TopBar({ onEditPress }: TopBarProps) {
             onPress={handleEditPress}
             className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-amber-800/20 transition-colors"
           >
-            <Edit3 className="w-6 h-6" color={isDarkMode ? "#fcd34d" : "#4b5563"} />
+            <Edit3 className="w-6 h-6" color={iconColor} />
           </TouchableOpacity>
           {user && (
             <TouchableOpacity
               onPress={signOut}
               className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-amber-800/20 transition-colors"
             >
-              <LogOut className="w-6 h-6" color={isDarkMode ? "#fcd34d" : "#4b5563"} />
+              <LogOut className="w-6 h-6" color={iconColor} />
             </TouchableOpacity>
           )}
         </View>
@@ -94,14 +97,14 @@ export default function TopBar({ onEditPress }: TopBarProps) {
             className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-amber-800/20 transition-colors disabled:opacity-50"
             disabled={fontSize <= 80}
           >
-            <Minus className="w-5 h-5" color={isDarkMode ? "#fcd34d" : "#4b5563"} />
+            <Minus className="w-5 h-5" color={iconColor} />
           </TouchableOpacity>
           <TouchableOpacity
             onPress={increaseFontSize}
             className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-amber-800/20 transition-colors disabled:opacity-50"
             disabled={fontSize >= 200}
           >
-            <Plus className="w-5 h-5" color={isDarkMode ? "#fcd34d" : "#4b5563"} />
+            <Plus className="w-5 h-5" color={iconColor} />
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -111,12 +114,12 @@ export default function TopBar({ onEditPress }: TopBarProps) {
             {!isPlaying ? (
               <VolumeX
                 className="w-6 h-6"
-                color={isDarkMode ? "#fcd34d" : "#4b5563"}
+                color={iconColor}
               />
             ) : (
               <Volume2
                 className="w-6 h-6"
-                color={isDarkMode ? "#fcd34d" : "#4b5563"}
+                color={iconColor}
               />
             )}
           </TouchableOpacity>
@@ -128,12 +131,12 @@ export default function TopBar({ onEditPress }: TopBarProps) {
             {isDarkMode ? (
               <Sun
                 className="w-6 h-6"
-                color={isDarkMode ? "#fcd34d" : "#4b5563"}
+                color={iconColor}
               />
             ) : (
               <Moon
                 className="w-6 h-6"
-                color={isDarkMode ? "#fcd34d" : "#4b5563"}
+                color={iconColor}
               />
             )}
           </TouchableOpacity>

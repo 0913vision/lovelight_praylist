@@ -2,6 +2,7 @@ import React from 'react';
 import { View, useColorScheme } from 'react-native';
 import Animated, { useAnimatedProps, SharedValue } from 'react-native-reanimated';
 import Svg, { Circle } from 'react-native-svg';
+import { Colors, getThemeColor } from '../constants/Colors';
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
@@ -26,8 +27,8 @@ export default function CircularProgress({
   const isDark = colorScheme === 'dark';
 
   // Theme-aware default colors
-  const defaultColor = color ?? (isDark ? '#fcd34d' : '#4b5563'); // amber-300 : gray-600
-  const defaultBackgroundColor = backgroundColor ?? (isDark ? '#404040' : '#e5e5e5'); // neutral-700 : neutral-200
+  const defaultColor = color ?? getThemeColor(Colors.progress.foreground, isDark);
+  const defaultBackgroundColor = backgroundColor ?? getThemeColor(Colors.progress.background, isDark);
   const radius = (size - strokeWidth) / 2;
   const circumference = radius * 2 * Math.PI;
 

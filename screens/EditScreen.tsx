@@ -24,6 +24,7 @@ import { usePrayers, PrayerData } from '../hooks/usePrayers';
 import { EditablePrayerData, EditablePrayerSection, EditablePrayerItem } from '../types';
 import PrayerSectionEditor from '../components/PrayerSectionEditor';
 import DateSelector from '../components/DateSelector';
+import { Colors, getThemeColor } from '../constants/Colors';
 
 type EditScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Edit'>;
 
@@ -250,7 +251,7 @@ export default function EditScreen({ navigation, initialData }: EditScreenProps)
               onPress={handleCancel}
               className="pl-1.5 rounded-lg"
             >
-              <ChevronLeft className="w-6 h-6" color={isDarkMode ? "#fcd34d" : "#4b5563"} />
+              <ChevronLeft className="w-6 h-6" color={getThemeColor(Colors.primary, isDarkMode)} />
             </TouchableOpacity>
           </View>
 
@@ -268,7 +269,7 @@ export default function EditScreen({ navigation, initialData }: EditScreenProps)
               onPress={handleSave}
               className="pr-1.5 rounded-lg"
             >
-              <Check className="w-6 h-6" color={isDarkMode ? "#fcd34d" : "#4b5563"} />
+              <Check className="w-6 h-6" color={getThemeColor(Colors.primary, isDarkMode)} />
             </TouchableOpacity>
           </View>
         </View>
@@ -341,7 +342,7 @@ export default function EditScreen({ navigation, initialData }: EditScreenProps)
               backgroundColor: 'transparent',
               borderWidth: 1,
               borderStyle: 'dashed',
-              borderColor: isDarkMode ? '#525252' : '#9ca3af',
+              borderColor: getThemeColor(Colors.border, isDarkMode),
               borderRadius: 8,
               paddingVertical: 16
             }}
@@ -377,7 +378,7 @@ export default function EditScreen({ navigation, initialData }: EditScreenProps)
                   저장 중...
                 </Text>
                 <View className="items-center py-4">
-                  <ActivityIndicator size="large" color={isDarkMode ? '#fcd34d' : '#4b5563'} />
+                  <ActivityIndicator size="large" color={getThemeColor(Colors.primary, isDarkMode)} />
                 </View>
               </>
             ) : (
@@ -411,13 +412,13 @@ export default function EditScreen({ navigation, initialData }: EditScreenProps)
                   <TouchableOpacity
                     onPress={handleConfirmSave}
                     className="flex-1 rounded-lg py-3"
-                    style={{ backgroundColor: isDarkMode ? '#fcd34d' : '#4b5563' }}
+                    style={{ backgroundColor: getThemeColor(Colors.button.background, isDarkMode) }}
                   >
                     <Text
                       className="text-center font-semibold"
                       style={{
                         fontSize: fontSize * 0.14,
-                        color: isDarkMode ? '#1f2937' : '#ffffff'
+                        color: getThemeColor(Colors.button.text, isDarkMode)
                       }}
                     >
                       저장

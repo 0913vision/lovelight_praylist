@@ -13,6 +13,7 @@ import { useTheme } from '../hooks/useTheme';
 import { Trash2 } from 'lucide-react-native';
 import { useFontSize } from '../contexts/FontSizeContext';
 import PrayerItemEditor from './PrayerItemEditor';
+import { Colors, getThemeColor } from '../constants/Colors';
 
 interface PrayerSectionEditorProps {
   section: EditablePrayerSection;
@@ -155,7 +156,7 @@ export default function PrayerSectionEditor({
               onChangeText={updateSectionName}
               placeholder={`소제목 (필수) (예: 홍길동)`}
               className="flex-1 border border-gray-300 dark:border-neutral-600 rounded-lg px-3 py-2 text-gray-900 dark:text-white bg-white dark:bg-neutral-700"
-              placeholderTextColor="#6B7280"
+              placeholderTextColor={getThemeColor(Colors.text.placeholder, isDarkMode)}
               style={{ fontSize: fontSize * 0.14 }}
             />
             <TouchableOpacity
@@ -165,7 +166,7 @@ export default function PrayerSectionEditor({
             >
               <Trash2
                 size={fontSize*0.14}
-                color={canRemove ? (isDarkMode ? '#ef4444' : '#dc2626') : (isDarkMode ? '#737373' : '#9ca3af')}
+                color={canRemove ? getThemeColor(Colors.status.error, isDarkMode) : getThemeColor(Colors.status.disabled, isDarkMode)}
                 strokeWidth={1.5}
                 opacity={canRemove ? 1 : 0.6}
               />
@@ -193,7 +194,7 @@ export default function PrayerSectionEditor({
                 backgroundColor: 'transparent',
                 borderWidth: 0.8,
                 borderStyle: 'dashed',
-                borderColor: isDarkMode ? '#525252' : '#9ca3af',
+                borderColor: getThemeColor(Colors.border, isDarkMode),
                 borderRadius: 8,
                 paddingVertical: 8
               }}
