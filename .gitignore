@@ -42,3 +42,10 @@ yarn-error.*
 
 # audio files
 *.mp3
+
+# claude settings
+.cluade/
+.playwright-mcp/
+
+# privacy
+.env
