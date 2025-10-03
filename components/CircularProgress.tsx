@@ -1,6 +1,5 @@
 import React from 'react';
-import { View } from 'react-native';
-import Animated, { useAnimatedProps, SharedValue } from 'react-native-reanimated';
+import Animated, { useAnimatedProps, useAnimatedStyle, useSharedValue, withRepeat, withTiming, Easing, SharedValue, useAnimatedReaction, cancelAnimation } from 'react-native-reanimated';
 import Svg, { Circle } from 'react-native-svg';
 import { useTheme } from '../hooks/useTheme';
 import { Colors, getThemeColor } from '../constants/Colors';
@@ -8,8 +7,8 @@ import { Colors, getThemeColor } from '../constants/Colors';
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
 interface CircularProgressProps {
-  progress: SharedValue<number> | number; // 0 to 1
-  isRefreshing: SharedValue<boolean> | boolean; // NEW: Show dashed circle when loading
+  progress: SharedValue<number>; // 0 to 1
+  isRefreshing: SharedValue<boolean>; // Show dashed circle when loading
   size?: number;
   strokeWidth?: number;
   color?: string;
@@ -37,13 +36,31 @@ export default function CircularProgress({
   const gapLength = 8;
   const dashPattern = `${dashLength} ${gapLength}`;
 
-  const isSharedValue = typeof progress === 'object' && 'value' in progress;
+  // Internal rotation animation
+  const rotation = useSharedValue(0);
+
+  // Trigger rotation when isRefreshing changes
+  useAnimatedReaction(
+    () => isRefreshing.value,
+    (refreshing) => {
+      if (refreshing) {
+        rotation.value = withRepeat(
+          withTiming(360, {
+            duration: 1500,
+            easing: Easing.linear
+          }),
+          -1,
+          false
+        );
+      } else {
+        cancelAnimation(rotation);
+        rotation.value = 0;
+      }
+    }
+  );
 
   const animatedProps = useAnimatedProps(() => {
-    const refreshing = isSharedValue ? (isRefreshing as SharedValue<boolean>).value : isRefreshing as boolean;
-    const progressValue = isSharedValue ? (progress as SharedValue<number>).value : progress as number;
-
-    if (refreshing) {
+    if (isRefreshing.value) {
       // When loading, show full dashed circle (no offset)
       return {
         strokeDashoffset: 0,
@@ -51,7 +68,7 @@ export default function CircularProgress({
       };
     } else {
       // When pulling, show progress
-      const strokeDashoffset = circumference * (1 - progressValue);
+      const strokeDashoffset = circumference * (1 - progress.value);
       return {
         strokeDashoffset,
         strokeDasharray: `${circumference}`,
@@ -60,14 +77,19 @@ export default function CircularProgress({
   });
 
   const backgroundAnimatedProps = useAnimatedProps(() => {
-    const refreshing = isSharedValue ? (isRefreshing as SharedValue<boolean>).value : isRefreshing as boolean;
     return {
-      opacity: refreshing ? 0 : 1,
+      opacity: isRefreshing.value ? 0 : 1,
+    };
+  });
+
+  const rotationStyle = useAnimatedStyle(() => {
+    return {
+      transform: [{ rotate: `${rotation.value}deg` }],
     };
   });
 
   return (
-    <View style={{ width: size, height: size }}>
+    <Animated.View style={[{ width: size, height: size }, rotationStyle]}>
       <Svg width={size} height={size}>
         {/* Background circle - hidden when loading */}
         <AnimatedCircle
@@ -92,6 +114,6 @@ export default function CircularProgress({
           transform={`rotate(-90 ${size / 2} ${size / 2})`}
         />
       </Svg>
-    </View>
+    </Animated.View>
   );
 }

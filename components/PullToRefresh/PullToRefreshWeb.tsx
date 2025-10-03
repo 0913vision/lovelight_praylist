@@ -1,5 +1,12 @@
-import React, { useState, useRef, forwardRef, useImperativeHandle } from 'react';
-import { View, ScrollView, Animated, NativeSyntheticEvent, NativeScrollEvent } from 'react-native';
+import React, { useRef, forwardRef, useImperativeHandle } from 'react';
+import { View, NativeSyntheticEvent, NativeScrollEvent } from 'react-native';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+  interpolate,
+  Extrapolation,
+} from 'react-native-reanimated';
 import CircularProgress from '../CircularProgress';
 
 interface PullToRefreshWebProps {
@@ -17,66 +24,50 @@ const PullToRefreshWeb = forwardRef<PullToRefreshWebRef, PullToRefreshWebProps>(
   children,
   threshold = 40,
 }, ref) => {
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [isPulling, setIsPulling] = useState(false);
-  const [progressValue, setProgressValue] = useState(0);
+  const isRefreshing = useSharedValue(false);
+  const isPulling = useSharedValue(false);
+  const progress = useSharedValue(0);
   const touchStartY = useRef(0);
   const scrollY = useRef(0);
-  const pullDistanceAnim = useRef(new Animated.Value(0)).current;
-  const progressAnim = useRef(new Animated.Value(0)).current;
-  const rotationAnim = useRef(new Animated.Value(0)).current;
+  const pullDistance = useSharedValue(0);
+  const opacity = useSharedValue(1);
 
   const performRefresh = async () => {
-    setIsRefreshing(true);
-
-    // Start spinning animation
-    const spinAnimation = Animated.loop(
-      Animated.timing(rotationAnim, {
-        toValue: 1,
-        duration: 1500,
-        useNativeDriver: true,
-      })
-    );
-    spinAnimation.start();
+    isRefreshing.value = true;
 
     try {
       await onRefresh();
     } finally {
-      // Stop spinning
-      spinAnimation.stop();
-
-      // First fade out (300ms)
-      Animated.timing(progressAnim, {
-        toValue: 0,
-        duration: 300,
-        useNativeDriver: true,
-      }).start(() => {
-        // Then slide up smoothly
-        Animated.timing(pullDistanceAnim, {
-          toValue: 0,
-          duration: 200,
-          useNativeDriver: true,
-        }).start(() => {
-          setIsRefreshing(false);
-          rotationAnim.setValue(0);
-        });
+      // Fade out the opacity
+      opacity.value = withTiming(0, { duration: 300 }, (finished) => {
+        if (finished) {
+          // Then slide up smoothly
+          pullDistance.value = withTiming(0, { duration: 200 }, (slideFinished) => {
+            if (slideFinished) {
+              // After slide up completes, reset everything
+              isRefreshing.value = false;
+              progress.value = 0;
+              opacity.value = 1; // Reset for next time
+            }
+          });
+        }
       });
     }
   };
 
   useImperativeHandle(ref, () => ({
     triggerRefresh: () => {
-      if (!isRefreshing) {
-        pullDistanceAnim.setValue(threshold);
-        progressAnim.setValue(1);
+      if (!isRefreshing.value) {
+        pullDistance.value = threshold;
+        progress.value = 1;
         performRefresh();
       }
     }
   }));
 
   const handleTouchStart = (e: any) => {
-    if (scrollY.current <= 0 && !isRefreshing) {
-      setIsPulling(true);
+    if (scrollY.current <= 0 && !isRefreshing.value) {
+      isPulling.value = true;
       // Web uses touches array
       const touch = e.nativeEvent.touches?.[0] || e.nativeEvent;
       touchStartY.current = touch.pageY || touch.clientY || 0;
@@ -84,7 +75,7 @@ const PullToRefreshWeb = forwardRef<PullToRefreshWebRef, PullToRefreshWebProps>(
   };
 
   const handleTouchMove = (e: any) => {
-    if (!isPulling || isRefreshing) return;
+    if (!isPulling.value || isRefreshing.value) return;
 
     // Web uses touches array
     const touch = e.nativeEvent.touches?.[0] || e.nativeEvent;
@@ -99,36 +90,22 @@ const PullToRefreshWeb = forwardRef<PullToRefreshWebRef, PullToRefreshWebProps>(
         threshold
       );
 
-      pullDistanceAnim.setValue(resistedDistance);
-      const progress = Math.min(resistedDistance / threshold, 1);
-      progressAnim.setValue(progress);
-      setProgressValue(progress);
+      pullDistance.value = resistedDistance;
+      progress.value = Math.min(resistedDistance / threshold, 1);
     }
   };
 
   const handleTouchEnd = () => {
-    const currentDistance = (pullDistanceAnim as any)._value;
+    if (!isPulling.value) return;
 
-    if (!isPulling) return;
+    isPulling.value = false;
 
-    setIsPulling(false);
-
-    if (currentDistance >= threshold) {
+    if (pullDistance.value >= threshold) {
       performRefresh();
     } else {
       // Reset with animation
-      Animated.parallel([
-        Animated.timing(progressAnim, {
-          toValue: 0,
-          duration: 200,
-          useNativeDriver: true,
-        }),
-        Animated.timing(pullDistanceAnim, {
-          toValue: 0,
-          duration: 200,
-          useNativeDriver: true,
-        })
-      ]).start();
+      pullDistance.value = withTiming(0, { duration: 200 });
+      progress.value = withTiming(0, { duration: 200 });
     }
   };
 
@@ -136,34 +113,44 @@ const PullToRefreshWeb = forwardRef<PullToRefreshWebRef, PullToRefreshWebProps>(
     scrollY.current = e.nativeEvent.contentOffset.y;
   };
 
-  const rotation = rotationAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['0deg', '360deg'],
+  const indicatorStyle = useAnimatedStyle(() => {
+    const indicatorTop = interpolate(
+      pullDistance.value,
+      [0, threshold],
+      [-32, threshold - 32],
+      Extrapolation.CLAMP
+    );
+
+    return {
+      position: 'absolute' as const,
+      top: indicatorTop,
+      left: 0,
+      right: 0,
+      height: 32,
+      alignItems: 'center' as const,
+      justifyContent: 'center' as const,
+      zIndex: 1,
+      opacity: opacity.value * interpolate(
+        pullDistance.value,
+        [0, 10],
+        [0, 1],
+        Extrapolation.CLAMP
+      ),
+    };
   });
 
-  const indicatorTop = pullDistanceAnim.interpolate({
-    inputRange: [0, threshold],
-    outputRange: [-32, threshold - 32],
+  const contentStyle = useAnimatedStyle(() => {
+    return {
+      flex: 1,
+      transform: [{ translateY: pullDistance.value }],
+    };
   });
 
   return (
     <View style={{ flex: 1, position: 'relative' }}>
       {/* Pull indicator */}
-      <Animated.View
-        style={{
-          position: 'absolute',
-          top: indicatorTop,
-          left: 0,
-          right: 0,
-          height: 32,
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 1,
-          opacity: progressAnim,
-          transform: [{ rotate: isRefreshing ? rotation : '0deg' }],
-        }}
-      >
-        <CircularProgress progress={progressValue} isRefreshing={isRefreshing} />
+      <Animated.View style={indicatorStyle}>
+        <CircularProgress progress={progress} isRefreshing={isRefreshing} />
       </Animated.View>
 
       {/* Scrollable content */}
@@ -173,12 +160,7 @@ const PullToRefreshWeb = forwardRef<PullToRefreshWebRef, PullToRefreshWebProps>(
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
       >
-        <Animated.View
-          style={{
-            flex: 1,
-            transform: [{ translateY: pullDistanceAnim }],
-          }}
-        >
+        <Animated.View style={contentStyle}>
           {React.cloneElement(children, {
             onScroll: handleScroll,
             scrollEventThrottle: 16,

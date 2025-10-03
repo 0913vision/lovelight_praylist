@@ -9,8 +9,6 @@ import Animated, {
   interpolate,
   Extrapolation,
   runOnJS,
-  withRepeat,
-  Easing,
 } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import CircularProgress from '../CircularProgress';
@@ -35,7 +33,6 @@ const PullToRefresh = forwardRef<PullToRefreshRef, PullToRefreshProps>(({
   const listContentOffsetY = useSharedValue(0);
   const isLoaderActive = useSharedValue(false);
   const progress = useSharedValue(0);
-  const rotation = useSharedValue(0);
   const loaderOpacity = useSharedValue(1);
 
   const applyResistance = (distance: number): number => {
@@ -57,7 +54,6 @@ const PullToRefresh = forwardRef<PullToRefreshRef, PullToRefreshProps>(({
           loaderOffsetY.value = 0;
           isRefreshing.value = false;
           isLoaderActive.value = false;
-          rotation.value = 0;
           progress.value = 0;
           loaderOpacity.value = 1; // Reset for next time
         }
@@ -73,16 +69,6 @@ const PullToRefresh = forwardRef<PullToRefreshRef, PullToRefreshProps>(({
         isLoaderActive.value = true;
         loaderOffsetY.value = threshold;
         progress.value = 1;
-
-        // Start spinning
-        rotation.value = withRepeat(
-          withTiming(360, {
-            duration: 1500,
-            easing: Easing.linear
-          }),
-          -1,
-          false
-        );
 
         performRefresh();
       }
@@ -124,17 +110,6 @@ const PullToRefresh = forwardRef<PullToRefreshRef, PullToRefreshProps>(({
       if (!isRefreshing.value) {
         if (loaderOffsetY.value >= threshold) {
           isRefreshing.value = true;
-
-          // Start spinning - slow and steady rotation
-          rotation.value = withRepeat(
-            withTiming(360, {
-              duration: 1500,
-              easing: Easing.linear
-            }),
-            -1,
-            false
-          );
-
           runOnJS(performRefresh)();
         } else {
           isLoaderActive.value = false;
@@ -160,9 +135,6 @@ const PullToRefresh = forwardRef<PullToRefreshRef, PullToRefreshProps>(({
     return {
       top: indicatorTop,
       opacity: pullOpacity * loaderOpacity.value,
-      transform: [
-        { rotate: `${rotation.value}deg` },
-      ],
     };
   });
 
