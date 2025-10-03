@@ -1,18 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View } from 'react-native';
+import { View, DeviceEventEmitter } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StackNavigationProp } from '@react-navigation/stack';
 import Toast from 'react-native-toast-message';
+import { RootStackParamList } from '../App';
 import TopBar from '../components/TopBar';
 import PrayerDisplay from '../components/PrayerDisplay';
 import PullToRefresh, { PullToRefreshRef } from '../components/PullToRefresh';
 import { usePrayers, PrayerData } from '../hooks/usePrayers';
-
-type RootStackParamList = {
-  Main: undefined;
-  Edit: undefined;
-};
 
 type MainScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Main'>;
 
@@ -42,6 +38,19 @@ export default function MainScreen({ navigation }: MainScreenProps) {
 
     initializeData();
   }, [loadCachedData]);
+
+  // EditScreen에서 저장 성공 시 이벤트 수신하여 PTR 트리거
+  useEffect(() => {
+    const subscription = DeviceEventEmitter.addListener('refreshPrayerData', () => {
+      setTimeout(() => {
+        pullToRefreshRef.current?.triggerRefresh();
+      }, 100);
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, []);
 
   const loadPrayerData = async () => {
     const data = await fetchLatestPrayer();

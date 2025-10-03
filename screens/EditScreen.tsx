@@ -9,12 +9,14 @@ import {
   ScrollView,
   Modal,
   ActivityIndicator,
+  DeviceEventEmitter,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { ChevronLeft, Check } from 'lucide-react-native';
 import Toast from 'react-native-toast-message';
+import { RootStackParamList } from '../App';
 import { useAudio } from '../contexts/AudioContext';
 import { useFontSize } from '../contexts/FontSizeContext';
 import { useTheme } from '../hooks/useTheme';
@@ -22,11 +24,6 @@ import { usePrayers, PrayerData } from '../hooks/usePrayers';
 import { EditablePrayerData, EditablePrayerSection, EditablePrayerItem } from '../types';
 import PrayerSectionEditor from '../components/PrayerSectionEditor';
 import DateSelector from '../components/DateSelector';
-
-type RootStackParamList = {
-  Main: undefined;
-  Edit: undefined;
-};
 
 type EditScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Edit'>;
 
@@ -211,7 +208,9 @@ export default function EditScreen({ navigation, initialData }: EditScreenProps)
         position: 'bottom',
         visibilityTime: 2000,
       });
+      // Main 화면에 refresh 이벤트 발송 후 goBack
       setTimeout(() => {
+        DeviceEventEmitter.emit('refreshPrayerData');
         navigation.goBack();
       }, 500);
     } else {
@@ -411,11 +410,15 @@ export default function EditScreen({ navigation, initialData }: EditScreenProps)
 
                   <TouchableOpacity
                     onPress={handleConfirmSave}
-                    className="flex-1 bg-blue-500 dark:bg-blue-600 rounded-lg py-3"
+                    className="flex-1 rounded-lg py-3"
+                    style={{ backgroundColor: isDarkMode ? '#fcd34d' : '#4b5563' }}
                   >
                     <Text
-                      className="text-white text-center font-semibold"
-                      style={{ fontSize: fontSize * 0.14 }}
+                      className="text-center font-semibold"
+                      style={{
+                        fontSize: fontSize * 0.14,
+                        color: isDarkMode ? '#1f2937' : '#ffffff'
+                      }}
                     >
                       저장
                     </Text>

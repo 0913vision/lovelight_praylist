@@ -11,7 +11,7 @@ import MainScreen from './screens/MainScreen';
 import EditScreen from './screens/EditScreen';
 import './global.css';
 
-type RootStackParamList = {
+export type RootStackParamList = {
   Main: undefined;
   Edit: undefined;
 };
