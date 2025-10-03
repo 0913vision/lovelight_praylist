@@ -1,10 +1,12 @@
 import React from 'react';
 import { View, Text } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 import Toast from 'react-native-toast-message';
+import { useColorScheme } from 'nativewind';
 import { FontSizeProvider } from './contexts/FontSizeContext';
 import { AudioProvider } from './contexts/AudioContext';
 import MainScreen from './screens/MainScreen';
@@ -18,11 +20,23 @@ export type RootStackParamList = {
 
 const Stack = createStackNavigator<RootStackParamList>();
 
+function ThemedStatusBar() {
+  const { colorScheme } = useColorScheme();
+
+  return (
+    <StatusBar
+      style={colorScheme === 'dark' ? 'light' : 'dark'}
+      backgroundColor={colorScheme === 'dark' ? '#171717' : '#ffffff'}
+    />
+  );
+}
+
 export default function App() {
   return (
     <SafeAreaProvider>
       <KeyboardProvider>
         <View className="flex-1 bg-white dark:bg-neutral-900">
+          <ThemedStatusBar />
           <NavigationContainer>
             <AudioProvider>
               <FontSizeProvider>
