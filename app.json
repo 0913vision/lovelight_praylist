@@ -18,10 +18,10 @@
       "bundleIdentifier": "com.lovelight.prayerlist"
     },
     "android": {
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/icon.png",
-        "backgroundColor": "#ffffff"
-      },
+      // "adaptiveIcon": {
+      //   "foregroundImage": "./assets/icon.png",
+      //   "backgroundColor": "#ffffff"
+      // },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "package": "com.lovelight.prayerlist",
