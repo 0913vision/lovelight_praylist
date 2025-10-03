@@ -377,7 +377,7 @@ export default function EditScreen({ navigation, initialData }: EditScreenProps)
                   저장 중...
                 </Text>
                 <View className="items-center py-4">
-                  <ActivityIndicator size="large" color={isDarkMode ? '#3b82f6' : '#2563eb'} />
+                  <ActivityIndicator size="large" color={isDarkMode ? '#fcd34d' : '#4b5563'} />
                 </View>
               </>
             ) : (
