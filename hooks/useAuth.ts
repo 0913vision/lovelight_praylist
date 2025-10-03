@@ -9,20 +9,42 @@ import { makeRedirectUri } from 'expo-auth-session';
 export const useAuth = () => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isAuthor, setIsAuthor] = useState(false);
+  const [isAllowedUser, setIsAllowedUser] = useState<boolean | null>(null);
 
   useEffect(() => {
     const getSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
-      setUser(session?.user ?? null);
+
+      if (session?.user) {
+        setUser(session.user);
+        setIsAllowedUser(null); // 확인 중
+        const { data } = await supabase
+          .from('allowed_users')
+          .select('is_author')
+          .eq('email', session.user.email)
+          .single();
+
+        if (data) {
+          setIsAllowedUser(true);
+          setIsAuthor(data.is_author || false);
+        } else {
+          setIsAllowedUser(false);
+        }
+      }
+
       setLoading(false);
     };
 
     getSession();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_, session) => {
-        setUser(session?.user ?? null);
-        setLoading(false);
+      async (event, session) => {
+        if (event === 'SIGNED_OUT') {
+          setUser(null);
+          setIsAllowedUser(null);
+          setIsAuthor(false);
+        }
       }
     );
 
@@ -34,10 +56,31 @@ export const useAuth = () => {
         const refreshToken = params.get('refresh_token');
 
         if (accessToken && refreshToken) {
-          await supabase.auth.setSession({
+          const { data } = await supabase.auth.setSession({
             access_token: accessToken,
             refresh_token: refreshToken
           });
+
+          if (data.session?.user) {
+            setUser(data.session.user);
+            setIsAllowedUser(null); // 확인 중
+
+            const authData = await supabase
+              .from('allowed_users')
+              .select('is_author')
+              .eq('email', data.session.user.email)
+              .single();
+
+            if (authData.data) {
+              setIsAllowedUser(true);
+              setIsAuthor(authData.data.is_author || false);
+            } else {
+              setIsAllowedUser(false);
+              setIsAuthor(false);
+            }
+
+            setLoading(false);
+          }
         }
       } else {
         await WebBrowser.dismissBrowser();
@@ -125,6 +168,8 @@ export const useAuth = () => {
   return {
     user,
     loading,
+    isAuthor,
+    isAllowedUser,
     signInWithKakao,
     signOut,
     forceSignOut,

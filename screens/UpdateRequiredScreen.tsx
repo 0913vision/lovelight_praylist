@@ -44,7 +44,7 @@ export default function UpdateRequiredScreen({
           </Text>
         </View>
 
-        <View className="bg-neutral-100 dark:bg-neutral-800 rounded-2xl p-6 mb-6 w-full">
+        <View className="bg-neutral-100 dark:bg-neutral-800 rounded-2xl p-6 mb-6" style={{ width: '80%' }}>
           <View className="flex-row justify-between mb-2">
             <Text style={{ fontSize: 20 }} className="text-neutral-600 dark:text-neutral-400">현재 버전</Text>
             <Text style={{ fontSize: 20 }} className="font-semibold text-neutral-900 dark:text-white">

@@ -9,7 +9,10 @@ import Toast from 'react-native-toast-message';
 import { FontSizeProvider } from './contexts/FontSizeContext';
 import { AudioProvider } from './contexts/AudioContext';
 import { useVersionCheck } from './hooks/useVersionCheck';
+import { useAuth } from './hooks/useAuth';
 import { useTheme } from './hooks/useTheme';
+import LoginScreen from './screens/LoginScreen';
+import UnauthorizedScreen from './screens/UnauthorizedScreen';
 import MainScreen from './screens/MainScreen';
 import EditScreen from './screens/EditScreen';
 import UpdateRequiredScreen from './screens/UpdateRequiredScreen';
@@ -18,6 +21,7 @@ import { Colors, getThemeColor } from './constants/Colors';
 import './global.css';
 
 export type RootStackParamList = {
+  Login: undefined;
   Main: undefined;
   Edit: undefined;
 };
@@ -36,6 +40,7 @@ function ThemedStatusBar() {
 }
 
 export default function App() {
+  const { user, loading: authLoading, isAllowedUser } = useAuth();
   const { isUpdateRequired, isChecking, currentVersion, minVersion } = useVersionCheck();
 
   return (
@@ -43,17 +48,37 @@ export default function App() {
       <KeyboardProvider>
         <View className="flex-1 bg-white dark:bg-neutral-900">
           <ThemedStatusBar />
-          {isChecking ? (
-            // 버전 체크 중 로딩 화면
-            <LoadingScreen />
-          ) : true || isUpdateRequired ? (
-            // 업데이트 필수 화면
+          {authLoading ? (
+            // 1단계: 로그인 확인 중
+            <LoadingScreen message={"사용자 정보를 확인하고 있어요"} />
+          ) : !user ? (
+            // 2단계: 로그인되지 않은 경우 로그인 화면
+            <NavigationContainer>
+              <Stack.Navigator
+                screenOptions={{
+                  headerShown: false,
+                }}
+              >
+                <Stack.Screen name="Login" component={LoginScreen} />
+              </Stack.Navigator>
+            </NavigationContainer>
+          ) : isAllowedUser === null ? (
+            // 3단계: 권한 확인 중
+            <LoadingScreen message="권한을 확인하고 있어요" />
+          ) : !isAllowedUser ? (
+            // 4단계: 로그인은 되었지만 allowed_users에 없는 경우
+            <UnauthorizedScreen />
+          ) : isChecking ? (
+            // 5단계: 버전 체크 중
+            <LoadingScreen message="최신 버전을 확인하고 있어요" />
+          ) : isUpdateRequired ? (
+            // 6단계: 업데이트 필수 화면
             <UpdateRequiredScreen
               currentVersion={currentVersion}
               minVersion={minVersion}
             />
           ) : (
-            // 정상 앱 화면
+            // 7단계: 정상 앱 화면 (로그인 완료 + 권한 확인 + 버전 확인 완료)
             <NavigationContainer>
               <AudioProvider>
                 <FontSizeProvider>
