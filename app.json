@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "사랑의빛교회 기도제목",
+    "name": "사빛교 기도제목",
     "slug": "prayerlist",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -18,10 +18,6 @@
       "bundleIdentifier": "com.lovelight.prayerlist"
     },
     "android": {
-      // "adaptiveIcon": {
-      //   "foregroundImage": "./assets/icon.png",
-      //   "backgroundColor": "#ffffff"
-      // },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "package": "com.lovelight.prayerlist",
@@ -36,6 +32,11 @@
     "plugins": [
       "expo-secure-store",
       "expo-web-browser"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "2cb6d1f4-d037-4a74-a500-7d63ab018b69"
+      }
+    }
   }
 }
