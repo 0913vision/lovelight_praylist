@@ -42,8 +42,8 @@ export default function LoginScreen() {
     <SafeAreaView className="flex-1 bg-white dark:bg-neutral-900">
       <View className="flex-1 justify-center items-center px-8">
         <View className="items-center mb-6">
-          <Text style={{ fontSize: 80 }} className="mb-6">🔐</Text>
-          <Text style={{ fontSize: 32 }} className="font-bold text-center mb-4 text-neutral-900 dark:text-white">
+          <Text style={{ fontSize: 80 }} className="mb-2">🔐</Text>
+          <Text style={{ fontSize: 32 }} className="font-bold text-center mb-6 text-neutral-900 dark:text-white">
             사랑의빛교회 기도 제목
           </Text>
           <Text style={{ fontSize: 18, lineHeight: 26 }} className="text-center text-neutral-600 dark:text-neutral-400">
