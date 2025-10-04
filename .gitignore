@@ -41,7 +41,7 @@ yarn-error.*
 /android
 
 # audio files
-*.mp3
+# *.mp3
 
 # claude settings
 .cluade/
