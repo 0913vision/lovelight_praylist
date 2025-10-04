@@ -39,9 +39,45 @@ function ThemedStatusBar() {
   );
 }
 
+function ThemedToastConfig(isDarkMode: boolean) {
+  return {
+    success: ({ text1 }: { text1: string }) => (
+      <View
+        style={{
+          backgroundColor: 'rgba(0, 0, 0, 0.8)',
+          paddingHorizontal: 20,
+          paddingVertical: 12,
+          borderRadius: 8,
+          marginHorizontal: 20,
+        }}
+      >
+        <Text style={{ color: Colors.text.primary.dark, fontSize: 14 }}>
+          {text1}
+        </Text>
+      </View>
+    ),
+    error: ({ text1 }: { text1: string }) => (
+      <View
+        style={{
+          backgroundColor: `${getThemeColor(Colors.status.error, isDarkMode)}e6`, // 90% opacity
+          paddingHorizontal: 20,
+          paddingVertical: 12,
+          borderRadius: 8,
+          marginHorizontal: 20,
+        }}
+      >
+        <Text style={{ color: Colors.text.primary.dark, fontSize: 14 }}>
+          {text1}
+        </Text>
+      </View>
+    ),
+  };
+}
+
 export default function App() {
   const { user, loading: authLoading, isAllowedUser } = useAuth();
   const { isUpdateRequired, isChecking, currentVersion, minVersion } = useVersionCheck();
+  const { isDarkMode } = useTheme();
 
   return (
     <SafeAreaProvider>
@@ -100,40 +136,7 @@ export default function App() {
               </AudioProvider>
             </NavigationContainer>
           )}
-          <Toast
-            config={{
-              success: ({ text1 }) => (
-                <View
-                  style={{
-                    backgroundColor: 'rgba(0, 0, 0, 0.8)',
-                    paddingHorizontal: 20,
-                    paddingVertical: 12,
-                    borderRadius: 8,
-                    marginHorizontal: 20,
-                  }}
-                >
-                  <Text style={{ color: Colors.text.primary.dark, fontSize: 14 }}>
-                    {text1}
-                  </Text>
-                </View>
-              ),
-              error: ({ text1 }) => (
-                <View
-                  style={{
-                    backgroundColor: 'rgba(220, 38, 38, 0.9)',
-                    paddingHorizontal: 20,
-                    paddingVertical: 12,
-                    borderRadius: 8,
-                    marginHorizontal: 20,
-                  }}
-                >
-                  <Text style={{ color: Colors.text.primary.dark, fontSize: 14 }}>
-                    {text1}
-                  </Text>
-                </View>
-              ),
-            }}
-          />
+          <Toast config={ThemedToastConfig(isDarkMode)} />
         </View>
       </KeyboardProvider>
     </SafeAreaProvider>

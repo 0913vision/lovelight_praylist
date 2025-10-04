@@ -14,7 +14,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { StackNavigationProp } from '@react-navigation/stack';
-import { ChevronLeft, Check } from 'lucide-react-native';
+import { ChevronLeft, Check, RotateCw } from 'lucide-react-native';
 import Toast from 'react-native-toast-message';
 import { RootStackParamList } from '../App';
 import { useAudio } from '../contexts/AudioContext';
@@ -37,7 +37,7 @@ export default function EditScreen({ navigation, initialData }: EditScreenProps)
   const { isPlaying, pause, play } = useAudio();
   const { fontSize } = useFontSize();
   const { isDarkMode } = useTheme();
-  const { uploadPrayer, loading } = usePrayers();
+  const { uploadPrayer, fetchLatestPrayer, loading } = usePrayers();
   const [scrollEnabled, setScrollEnabled] = useState(true);
   const [dummyHeight, setDummyHeight] = useState(0);
   const scrollViewRef = useRef<ScrollView>(null);
@@ -45,6 +45,8 @@ export default function EditScreen({ navigation, initialData }: EditScreenProps)
   const [showExitModal, setShowExitModal] = useState(false);
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [showLoadModal, setShowLoadModal] = useState(false);
+  const [isLoadingData, setIsLoadingData] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
 
   // 편집 모드 진입/나갈 때 음악 상태 관리
@@ -86,6 +88,26 @@ export default function EditScreen({ navigation, initialData }: EditScreenProps)
 
   const generateSectionId = () => `section-${Date.now()}-${Math.random()}`;
   const generateItemId = () => `item-${Date.now()}-${Math.random()}`;
+
+  // PrayerData를 EditablePrayerData로 변환
+  const convertToEditableData = (data: PrayerData): EditablePrayerData => {
+    const baseTimestamp = Date.now();
+
+    return {
+      title: data.title,
+      date: new Date().toISOString().split('T')[0], // 현재 날짜로 설정
+      sections: data.sections.map((section, sectionIndex) => ({
+        id: `section-${baseTimestamp}-${sectionIndex}`,
+        name: section.name,
+        items: section.items.map((item, itemIndex) => ({
+          id: `item-${baseTimestamp}-${sectionIndex}-${itemIndex}`,
+          content: item,
+          isNew: false,
+        })),
+        isNew: false,
+      })),
+    };
+  };
 
   const addSection = () => {
     const baseTimestamp = Date.now();
@@ -241,30 +263,88 @@ export default function EditScreen({ navigation, initialData }: EditScreenProps)
     setShowExitModal(false);
   };
 
+  const handleLoadData = async () => {
+    setIsLoadingData(true);
+
+    try {
+      // DB에서 최신 기도제목 가져오기
+      const data = await fetchLatestPrayer();
+
+      if (data) {
+        // PrayerData를 EditablePrayerData로 변환
+        const editableData = convertToEditableData(data);
+
+        // 상태 업데이트
+        setPrayerData(editableData);
+        setHasChanges(false); // 변경사항 추적 초기화
+
+        setIsLoadingData(false);
+        setShowLoadModal(false);
+
+        // 성공 Toast
+        Toast.show({
+          type: 'success',
+          text1: '기도제목을 불러왔습니다',
+          position: 'bottom',
+          visibilityTime: 2000,
+        });
+      } else {
+        setIsLoadingData(false);
+        setShowLoadModal(false);
+
+        // 실패 Toast
+        Toast.show({
+          type: 'error',
+          text1: '기도제목을 불러오는데 실패했습니다',
+          position: 'bottom',
+          visibilityTime: 3000,
+        });
+      }
+    } catch (error) {
+      setIsLoadingData(false);
+      setShowLoadModal(false);
+
+      // 에러 Toast
+      Toast.show({
+        type: 'error',
+        text1: '기도제목을 불러오는데 실패했습니다',
+        position: 'bottom',
+        visibilityTime: 3000,
+      });
+    }
+  };
+
   return (
     <SafeAreaView className="flex-1 bg-white dark:bg-neutral-900">
       {/* Header */}
       <View className="bg-white/95 dark:bg-neutral-900/90 backdrop-blur-xl border-b border-gray-200/50 dark:border-neutral-700/30 px-4 py-3">
         <View className="flex-row items-center w-full">
-          <View className="w-12">
+          <View className="w-24 flex-row items-center gap-3">
             <TouchableOpacity
               onPress={handleCancel}
               className="pl-1.5 rounded-lg"
             >
               <ChevronLeft className="w-6 h-6" color={getThemeColor(Colors.primary, isDarkMode)} />
             </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => setShowLoadModal(true)}
+              className="rounded-lg"
+            >
+              <RotateCw className="w-6 h-6" color={getThemeColor(Colors.primary, isDarkMode)} />
+            </TouchableOpacity>
           </View>
 
           <View className="flex-1 items-center">
             <Text
               className="font-semibold text-gray-900 dark:text-white"
-              style={{ fontSize: fontSize * 0.2 }}
+              style={{ fontSize: fontSize * 0.16 }}
             >
               기도제목 편집
             </Text>
           </View>
 
-          <View className="w-12 items-end">
+          <View className="w-24 flex-row items-center justify-end gap-3">
+            <View className="w-6 h-6" />
             <TouchableOpacity
               onPress={handleSave}
               className="pr-1.5 rounded-lg"
@@ -422,6 +502,85 @@ export default function EditScreen({ navigation, initialData }: EditScreenProps)
                       }}
                     >
                       저장
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
+          </View>
+        </View>
+      </Modal>
+
+      {/* Load Confirmation Modal */}
+      <Modal
+        visible={showLoadModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => !isLoadingData && setShowLoadModal(false)}
+      >
+        <View className="flex-1 justify-center items-center bg-black/50">
+          <View className="bg-white dark:bg-neutral-800 rounded-2xl p-6 w-4/5 max-w-sm shadow-2xl">
+            {isLoadingData ? (
+              <>
+                <Text
+                  className="text-gray-900 dark:text-white font-semibold mb-3 text-center"
+                  style={{ fontSize: fontSize * 0.16 }}
+                >
+                  불러오는 중...
+                </Text>
+                <Text
+                  className="text-gray-600 dark:text-gray-400 mb-3 text-center"
+                  style={{ fontSize: fontSize * 0.13 }}
+                >
+                  기도제목을 불러오고 있어요.{'\n'}
+                  잠깐만 기다려주세요.
+                </Text>
+                <View className="items-center py-4">
+                  <ActivityIndicator size="large" color={getThemeColor(Colors.primary, isDarkMode)} />
+                </View>
+              </>
+            ) : (
+              <>
+                <Text
+                  className="text-gray-900 dark:text-white font-semibold mb-3 text-center"
+                  style={{ fontSize: fontSize * 0.16 }}
+                >
+                  기도제목 불러오기
+                </Text>
+                <Text
+                  className="text-gray-600 dark:text-gray-400 mb-6 text-center"
+                  style={{ fontSize: fontSize * 0.13 }}
+                >
+                  마지막에 작성한 기도제목을 불러올까요?{'\n'}
+                  현재 작성 중인 내용은 모두 사라집니다.
+                </Text>
+
+                <View className="flex-row gap-3">
+                  <TouchableOpacity
+                    onPress={() => setShowLoadModal(false)}
+                    className="flex-1 bg-gray-200 dark:bg-neutral-700 rounded-lg py-3"
+                  >
+                    <Text
+                      className="text-gray-800 dark:text-gray-200 text-center font-medium"
+                      style={{ fontSize: fontSize * 0.14 }}
+                    >
+                      취소
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    onPress={handleLoadData}
+                    className="flex-1 rounded-lg py-3"
+                    style={{ backgroundColor: getThemeColor(Colors.button.background, isDarkMode) }}
+                  >
+                    <Text
+                      className="text-center font-semibold"
+                      style={{
+                        fontSize: fontSize * 0.14,
+                        color: getThemeColor(Colors.button.text, isDarkMode)
+                      }}
+                    >
+                      불러오기
                     </Text>
                   </TouchableOpacity>
                 </View>
