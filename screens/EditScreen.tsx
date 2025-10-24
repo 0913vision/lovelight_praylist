@@ -14,7 +14,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { StackNavigationProp } from '@react-navigation/stack';
-import { ChevronLeft, Check, RotateCw } from 'lucide-react-native';
+import { ChevronLeft, Check, Download } from 'lucide-react-native';
 import Toast from 'react-native-toast-message';
 import { RootStackParamList } from '../App';
 import { useAudio } from '../contexts/AudioContext';
@@ -330,7 +330,7 @@ export default function EditScreen({ navigation, initialData }: EditScreenProps)
               onPress={() => setShowLoadModal(true)}
               className="rounded-lg"
             >
-              <RotateCw className="w-6 h-6" color={getThemeColor(Colors.primary, isDarkMode)} />
+              <Download className="w-6 h-6" color={getThemeColor(Colors.primary, isDarkMode)} />
             </TouchableOpacity>
           </View>
 
