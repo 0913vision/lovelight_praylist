@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../lib/supabase';
 import { Platform } from 'react-native';
@@ -19,12 +19,23 @@ export interface UserSession {
   loginTimestamp: number;
 }
 
-export const useAuth = () => {
+interface AuthContextType {
+  user: KakaoUser | null;
+  loading: boolean;
+  isAuthor: boolean;
+  isAllowedUser: boolean | null;
+  signInWithKakao: () => Promise<{ data: KakaoUser | null; error: Error | null }>;
+  signOut: () => Promise<void>;
+  forceSignOut: () => Promise<void>;
+}
+
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<KakaoUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [isAuthor, setIsAuthor] = useState(false);
   const [isAllowedUser, setIsAllowedUser] = useState<boolean | null>(null);
-  const [, forceUpdate] = useState({});
 
   // 세션 저장
   const saveSession = async (session: UserSession) => {
@@ -55,17 +66,43 @@ export const useAuth = () => {
     }
   };
 
+  // denied_users에 사용자 등록 (없을 때만)
+  const recordDeniedUser = async (kakaoUser: KakaoUser) => {
+    try {
+      // denied_users에 이미 있는지 확인
+      const { data: existingUser } = await supabase
+        .from('denied_users')
+        .select('kakao_id')
+        .eq('kakao_id', kakaoUser.id)
+        .single();
+
+      // 없을 때만 추가
+      if (!existingUser) {
+        await supabase
+          .from('denied_users')
+          .insert({
+            kakao_id: kakaoUser.id,
+            nickname: kakaoUser.nickname,
+            email: kakaoUser.email,
+          });
+      }
+    } catch (error) {
+      // 에러는 조용히 무시 (이미 존재하거나 네트워크 오류)
+    }
+  };
+
   // Supabase에서 사용자 권한 확인
-  const checkUserPermission = async (kakaoId: string) => {
+  const checkUserPermission = async (kakaoUser: KakaoUser) => {
     try {
       const { data, error } = await supabase
         .from('allowed_users')
         .select('is_author')
-        .eq('kakao_id', kakaoId)
+        .eq('kakao_id', kakaoUser.id)
         .single();
 
       if (error) {
-        // 사용자가 allowed_users에 없음
+        // allowed_users에 없으면 denied_users에 기록
+        await recordDeniedUser(kakaoUser);
         return { isAllowed: false, isAuthor: false };
       }
 
@@ -79,7 +116,35 @@ export const useAuth = () => {
     }
   };
 
-  // 초기화: 저장된 세션 확인
+  // 사용자 로그인 처리 (권한 확인 + 상태 업데이트 + 세션 저장)
+  const processUserLogin = async (kakaoUser: KakaoUser) => {
+    console.log('카카오 ID:', kakaoUser.id);
+    console.log('닉네임:', kakaoUser.nickname);
+    console.log('이메일:', kakaoUser.email);
+
+    // 권한 확인
+    const { isAllowed, isAuthor: authorStatus } = await checkUserPermission(kakaoUser);
+
+    console.log('권한:', { isAllowed, isAuthor: authorStatus });
+
+    // 세션 저장
+    const session: UserSession = {
+      kakaoUser,
+      isAuthor: authorStatus,
+      isAllowedUser: isAllowed,
+      loginTimestamp: Date.now(),
+    };
+    await saveSession(session);
+
+    // 상태 업데이트
+    setUser(kakaoUser);
+    setIsAllowedUser(isAllowed);
+    setIsAuthor(authorStatus);
+
+    return { isAllowed, isAuthor: authorStatus };
+  };
+
+  // 초기화: 저장된 세션 확인 (자동 로그인)
   useEffect(() => {
     const initializeAuth = async () => {
       try {
@@ -88,9 +153,10 @@ export const useAuth = () => {
         const session = await loadSession();
 
         if (session) {
-          setUser(session.kakaoUser);
-          setIsAuthor(session.isAuthor);
-          setIsAllowedUser(session.isAllowedUser);
+          console.log('=== 자동 로그인 ===');
+          // 공통 로그인 처리 로직 사용
+          await processUserLogin(session.kakaoUser);
+          console.log('==================');
         }
       } catch (error) {
         console.error('인증 초기화 실패:', error);
@@ -105,9 +171,8 @@ export const useAuth = () => {
   // 카카오 로그인
   const signInWithKakao = async () => {
     try {
-      setLoading(true); // 로딩 시작
+      setLoading(true);
 
-      // 웹 플랫폼에서는 네이티브 Kakao SDK를 사용할 수 없음
       if (Platform.OS === 'web') {
         setLoading(false);
         return {
@@ -116,17 +181,16 @@ export const useAuth = () => {
         };
       }
 
-      // 카카오 로그인
       const result = await KakaoLogin.login();
 
       if (!result) {
+        setLoading(false);
         return {
           data: null,
           error: new Error('카카오 로그인 실패'),
         };
       }
 
-      // 사용자 정보 가져오기
       const profile = await KakaoLogin.getProfile();
 
       const kakaoUser: KakaoUser = {
@@ -135,48 +199,13 @@ export const useAuth = () => {
         email: profile.email,
       };
 
-      // Supabase에서 권한 확인
-      console.log('권한 확인 시작, kakaoId:', kakaoUser.id);
-      setIsAllowedUser(null); // 확인 중
-      const { isAllowed, isAuthor: authorStatus } = await checkUserPermission(
-        kakaoUser.id
-      );
-
-      console.log('권한 확인 결과:', { isAllowed, isAuthor: authorStatus });
-
-      // 세션 저장 (권한 여부와 관계없이)
-      const session: UserSession = {
-        kakaoUser,
-        isAuthor: authorStatus,
-        isAllowedUser: isAllowed,
-        loginTimestamp: Date.now(),
-      };
-      await saveSession(session);
-
-      if (isAllowed) {
-        console.log('사용자 허용됨, 메인 화면으로 이동');
-      } else {
-        console.log('사용자가 allowed_users에 없음, UnauthorizedScreen으로 이동');
-      }
-
-      // 모든 상태를 동시에 업데이트하고 로딩 종료
-      setUser(kakaoUser);
-      setIsAllowedUser(isAllowed);
-      setIsAuthor(authorStatus);
+      // 공통 로그인 처리 로직 사용
+      await processUserLogin(kakaoUser);
       setLoading(false);
-      forceUpdate({}); // 강제 리렌더
 
       return { data: kakaoUser, error: null };
     } catch (error: any) {
-      console.error('카카오 로그인 오류:', error);
-      console.error('에러 메시지:', error.message);
-      console.error('에러 상세:', JSON.stringify(error, null, 2));
-      if (error.message) {
-        console.log('==== 이 메시지를 확인하세요 ====');
-        console.log(error.message);
-        console.log('================================');
-      }
-      setLoading(false); // 에러 발생 시에도 로딩 종료
+      setLoading(false);
       return { data: null, error };
     }
   };
@@ -196,18 +225,31 @@ export const useAuth = () => {
     }
   };
 
-  // 강제 로그아웃 (기존 forceSignOut과 동일한 동작)
   const forceSignOut = async () => {
     await signOut();
   };
 
-  return {
-    user,
-    loading,
-    isAuthor,
-    isAllowedUser,
-    signInWithKakao,
-    signOut,
-    forceSignOut,
-  };
+  return (
+    <AuthContext.Provider
+      value={{
+        user,
+        loading,
+        isAuthor,
+        isAllowedUser,
+        signInWithKakao,
+        signOut,
+        forceSignOut,
+      }}
+    >
+      {children}
+    </AuthContext.Provider>
+  );
+};
+
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (context === undefined) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
 };

@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, ActivityIndicator } from 'react-native';
+import { View, Text } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
@@ -8,8 +8,8 @@ import { KeyboardProvider } from 'react-native-keyboard-controller';
 import Toast from 'react-native-toast-message';
 import { FontSizeProvider } from './contexts/FontSizeContext';
 import { AudioProvider } from './contexts/AudioContext';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { useVersionCheck } from './hooks/useVersionCheck';
-import { useAuth } from './hooks/useAuth';
 import { useTheme } from './hooks/useTheme';
 import LoginScreen from './screens/LoginScreen';
 import UnauthorizedScreen from './screens/UnauthorizedScreen';
@@ -41,7 +41,7 @@ function ThemedStatusBar() {
 
 function ThemedToastConfig(isDarkMode: boolean) {
   return {
-    success: ({ text1 }: { text1: string }) => (
+    success: ({ text1 }: { text1?: string }) => (
       <View
         style={{
           backgroundColor: 'rgba(0, 0, 0, 0.8)',
@@ -56,7 +56,7 @@ function ThemedToastConfig(isDarkMode: boolean) {
         </Text>
       </View>
     ),
-    error: ({ text1 }: { text1: string }) => (
+    error: ({ text1 }: { text1?: string }) => (
       <View
         style={{
           backgroundColor: `${getThemeColor(Colors.status.error, isDarkMode)}e6`, // 90% opacity
@@ -74,16 +74,14 @@ function ThemedToastConfig(isDarkMode: boolean) {
   };
 }
 
-export default function App() {
+function AppContent() {
   const { user, loading: authLoading, isAllowedUser } = useAuth();
   const { isUpdateRequired, isChecking, currentVersion, minVersion } = useVersionCheck();
   const { isDarkMode } = useTheme();
 
   return (
-    <SafeAreaProvider>
-      <KeyboardProvider>
-        <View className="flex-1 bg-white dark:bg-neutral-900">
-          <ThemedStatusBar />
+    <View className="flex-1 bg-white dark:bg-neutral-900">
+      <ThemedStatusBar />
           {authLoading ? (
             // 1단계: 로그인 확인 중
             <LoadingScreen message={"사용자 정보를 확인하고 있어요"} />
@@ -136,8 +134,18 @@ export default function App() {
               </AudioProvider>
             </NavigationContainer>
           )}
-          <Toast config={ThemedToastConfig(isDarkMode)} />
-        </View>
+      <Toast config={ThemedToastConfig(isDarkMode)} />
+    </View>
+  );
+}
+
+export default function App() {
+  return (
+    <SafeAreaProvider>
+      <KeyboardProvider>
+        <AuthProvider>
+          <AppContent />
+        </AuthProvider>
       </KeyboardProvider>
     </SafeAreaProvider>
   );

@@ -15,7 +15,20 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.lovelight.prayerlist"
+      "bundleIdentifier": "com.lovelight.prayerlist",
+      "infoPlist": {
+        "LSApplicationQueriesSchemes": [
+          "kakaokompassauth",
+          "kakaolink"
+        ],
+        "CFBundleURLTypes": [
+          {
+            "CFBundleURLSchemes": [
+              "kakao${EXPO_PUBLIC_KAKAO_APP_KEY}"
+            ]
+          }
+        ]
+      }
     },
     "android": {
       "edgeToEdgeEnabled": true,
@@ -31,7 +44,24 @@
     ],
     "plugins": [
       "expo-secure-store",
-      "expo-web-browser"
+      "expo-web-browser",
+      [
+        "@react-native-seoul/kakao-login",
+        {
+          "kakaoAppKey": "YOUR_KAKAO_APP_KEY_HERE",
+          "kotlinVersion": "2.0.0"
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "extraMavenRepos": [
+              "https://devrepo.kakao.com/nexus/content/groups/public/"
+            ]
+          }
+        }
+      ]
     ],
     "extra": {
       "eas": {

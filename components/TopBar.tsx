@@ -44,12 +44,13 @@ export default function TopBar({ onEditPress }: TopBarProps) {
               <Edit3 className="w-6 h-6" color={iconColor} />
             </TouchableOpacity>
           )}
-          <TouchableOpacity
+          {/* 로그아웃 버튼 - 현재 사용 안함 */}
+          {/* <TouchableOpacity
             onPress={signOut}
             className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-amber-800/20 transition-colors"
           >
             <LogOut className="w-6 h-6" color={iconColor} />
-          </TouchableOpacity>
+          </TouchableOpacity> */}
         </View>
 
         <View></View>

@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, ActivityIndicator, Platform, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useAuth } from '../hooks/useAuth';
+import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../hooks/useTheme';
 import { Colors, getThemeColor } from '../constants/Colors';
 
@@ -20,10 +20,17 @@ export default function LoginScreen() {
   const handleKakaoLogin = async () => {
     try {
       const { error } = await signInWithKakao();
+
       if (error) {
+        // 사용자가 취소한 경우는 조용히 처리
+        if (error.message?.includes('user cancelled')) {
+          return;
+        }
+        // 실제 에러인 경우에만 팝업 표시
         showAlert('로그인 오류', error.message);
       }
     } catch (error) {
+      console.error('handleKakaoLogin 에러:', error);
       showAlert('오류', '예상치 못한 오류가 발생했습니다');
     }
   };
