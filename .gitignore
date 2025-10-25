@@ -49,3 +49,9 @@ yarn-error.*
 
 # privacy
 .env
+
+# credentials
+credentials.json
+
+# apk
+*.apk
