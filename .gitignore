@@ -44,7 +44,7 @@ yarn-error.*
 # *.mp3
 
 # claude settings
-.cluade/
+.claude/
 .playwright-mcp/
 
 # privacy

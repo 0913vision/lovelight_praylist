@@ -6,7 +6,10 @@
     "start": "expo start",
     "android": "expo run:android",
     "ios": "expo run:ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "prebuild": "npx expo prebuild --clean",
+    "build:preview": "eas build --platform android --profile preview --local",
+    "build:production": "eas build --platform android --profile production --local"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "2.2.0",
@@ -44,6 +47,7 @@
   },
   "devDependencies": {
     "@types/react": "~19.1.0",
+    "dotenv": "^17.2.3",
     "tailwindcss": "^3.4.17",
     "typescript": "~5.9.2"
   },
