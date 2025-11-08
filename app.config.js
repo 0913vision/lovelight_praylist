@@ -7,13 +7,18 @@ module.exports = {
     version: "1.0.0",
     orientation: "portrait",
     icon: "./assets/icon.png",
-    userInterfaceStyle: "light",
+    userInterfaceStyle: "automatic",
     newArchEnabled: true,
     scheme: "prayerlist",
     splash: {
       image: "./assets/splash-icon.png",
       resizeMode: "contain",
-      backgroundColor: "#ffffff"
+      backgroundColor: "#ffffff",
+      dark: {
+        image: "./assets/splash-icon.png",
+        resizeMode: "contain",
+        backgroundColor: "#171717"
+      }
     },
     ios: {
       supportsTablet: true,

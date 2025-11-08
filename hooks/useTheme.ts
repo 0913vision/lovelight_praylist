@@ -4,8 +4,9 @@ import { Appearance } from 'react-native';
 import { useColorScheme } from 'nativewind';
 
 export function useTheme() {
-  const [isDarkMode, setIsDarkMode] = useState(true);
-  const { colorScheme, setColorScheme } = useColorScheme();
+  const systemColorScheme = Appearance.getColorScheme();
+  const [isDarkMode, setIsDarkMode] = useState(systemColorScheme === 'dark');
+  const { setColorScheme } = useColorScheme();
 
   useEffect(() => {
     const initializeTheme = async () => {

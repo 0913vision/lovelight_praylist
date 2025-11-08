@@ -52,7 +52,6 @@ export default function MainScreen({ navigation }: MainScreenProps) {
     };
   }, []);
 
-
   const loadPrayerData = async () => {
     const data = await fetchLatestPrayer();
     if (data) {
