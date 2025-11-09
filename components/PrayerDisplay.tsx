@@ -1,5 +1,7 @@
 import React from 'react';
 import { View, Text } from 'react-native';
+import WrappedText from 'react-native-wrapped-text';
+import { useColorScheme } from 'nativewind';
 import type { PrayerSection } from '../hooks/usePrayers';
 import { useFontSize } from '../contexts/FontSizeContext';
 
@@ -14,6 +16,9 @@ interface PrayerDisplayProps {
 
 export default function PrayerDisplay({ title, sections, verse }: PrayerDisplayProps) {
   const { getTitleStyle, getFontSizeStyle, getVerseStyle } = useFontSize();
+  const { colorScheme } = useColorScheme();
+
+  const textColor = colorScheme === 'dark' ? '#d1d5db' : '#374151';
 
   return (
     <View className="space-y-8">
@@ -38,12 +43,19 @@ export default function PrayerDisplay({ title, sections, verse }: PrayerDisplayP
                   >
                     {itemIndex + 1}.{' '}
                   </Text>
-                  <Text
-                    className="text-gray-700 dark:text-gray-300 leading-relaxed flex-1"
-                    style={getFontSizeStyle()}
-                  >
-                    {item}
-                  </Text>
+                  <View className="flex-1">
+                    <WrappedText
+                      containerStyle={{ alignItems: 'flex-start', alignSelf: 'flex-start' }}
+                      rowWrapperStyle={{ justifyContent: 'flex-start' }}
+                      textStyle={{
+                        ...getFontSizeStyle(),
+                        color: textColor,
+                        lineHeight: getFontSizeStyle().fontSize * 1.5,
+                      }}
+                    >
+                      {item as any}
+                    </WrappedText>
+                  </View>
                 </View>
               ))}
 
@@ -67,12 +79,19 @@ export default function PrayerDisplay({ title, sections, verse }: PrayerDisplayP
                           >
                             {itemIndex + 1}.{' '}
                           </Text>
-                          <Text
-                            className="text-gray-700 dark:text-gray-300 leading-relaxed flex-1"
-                            style={getFontSizeStyle()}
-                          >
-                            {item}
-                          </Text>
+                          <View className="flex-1">
+                            <WrappedText
+                              containerStyle={{ alignItems: 'flex-start', alignSelf: 'flex-start' }}
+                              rowWrapperStyle={{ justifyContent: 'flex-start' }}
+                              textStyle={{
+                                ...getFontSizeStyle(),
+                                color: textColor,
+                                lineHeight: getFontSizeStyle().fontSize * 1.5,
+                              }}
+                            >
+                              {item as any}
+                            </WrappedText>
+                          </View>
                         </View>
                       ))}
                     </View>
