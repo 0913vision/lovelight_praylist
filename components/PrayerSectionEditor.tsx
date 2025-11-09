@@ -250,7 +250,7 @@ export default function PrayerSectionEditor({
           <View>
             <Text
               className="text-sm text-gray-600 dark:text-gray-400 mb-2"
-              style={{ fontSize: fontSize * 0.13 }}
+              style={{ fontSize: fontSize * 0.13, lineHeight: fontSize * 0.13 * 1.5 }}
             >
               공통 기도제목
             </Text>
@@ -293,7 +293,7 @@ export default function PrayerSectionEditor({
           <View className="mt-4">
             <Text
               className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
-              style={{ fontSize: fontSize * 0.13 }}
+              style={{ fontSize: fontSize * 0.13, lineHeight: fontSize * 0.13 * 1.5 }}
             >
               세부 주제
             </Text>

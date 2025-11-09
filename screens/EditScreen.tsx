@@ -5,18 +5,20 @@ import {
   TextInput,
   TouchableOpacity,
   Platform,
-  Alert,
   ScrollView,
   Modal,
   ActivityIndicator,
   DeviceEventEmitter,
   BackHandler,
+  Animated,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { ChevronLeft, Check, Download } from 'lucide-react-native';
 import Toast from 'react-native-toast-message';
+import WrappedText from 'react-native-wrapped-text';
+import { useColorScheme } from 'nativewind';
 import { RootStackParamList } from '../App';
 import { useAudio } from '../contexts/AudioContext';
 import { useFontSize } from '../contexts/FontSizeContext';
@@ -38,6 +40,7 @@ export default function EditScreen({ navigation, initialData }: EditScreenProps)
   const { isPlaying, pause, play } = useAudio();
   const { fontSize } = useFontSize();
   const { isDarkMode } = useTheme();
+  const { colorScheme } = useColorScheme();
   const { uploadPrayer, fetchLatestPrayer, loading } = usePrayers();
   const [scrollState, setScrollState] = useState({ enabled: true, dummyHeight: 0 });
   const scrollViewRef = useRef<ScrollView>(null);
@@ -49,7 +52,11 @@ export default function EditScreen({ navigation, initialData }: EditScreenProps)
   const [showLoadModal, setShowLoadModal] = useState(false);
   const [isLoadingData, setIsLoadingData] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
+  const [showErrorModal, setShowErrorModal] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
   const pendingDeleteLocksRef = useRef(0);
+
+  const modalOpacity = useRef(new Animated.Value(0)).current;
 
   // 편집 모드 진입/나갈 때 음악 상태 관리
   useEffect(() => {
@@ -189,15 +196,33 @@ export default function EditScreen({ navigation, initialData }: EditScreenProps)
     setHasChanges(true);
   };
 
+  const showError = (message: string) => {
+    setErrorMessage(message);
+    setShowErrorModal(true);
+    Animated.timing(modalOpacity, {
+      toValue: 1,
+      duration: 150,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const hideModal = (closeFunction: () => void) => {
+    Animated.timing(modalOpacity, {
+      toValue: 0,
+      duration: 100,
+      useNativeDriver: true,
+    }).start(() => closeFunction());
+  };
+
   const validateData = (): boolean => {
     if (prayerData.sections.length === 0) {
-      Alert.alert('오류', '최소 하나의 이름/주제를 추가해주세요.');
+      showError('최소 하나의 이름/주제를 추가해주세요.');
       return false;
     }
 
     for (const section of prayerData.sections) {
       if (!section.name.trim()) {
-        Alert.alert('오류', '모든 이름/주제를 입력해주세요.');
+        showError('모든 이름/주제를 입력해주세요.');
         return false;
       }
 
@@ -210,14 +235,14 @@ export default function EditScreen({ navigation, initialData }: EditScreenProps)
       // Subsection이 있다면 name은 필수
       for (const subsection of section.subsections ?? []) {
         if (!subsection.name.trim()) {
-          Alert.alert('오류', `"${section.name}" 이름/주제의 세부 주제 이름을 모두 입력해주세요.`);
+          showError(`"${section.name}" 이름/주제의 세부 주제 이름을 모두 입력해주세요.`);
           return false;
         }
       }
 
       // Section은 최소 1개의 기도제목 또는 1개의 유효한 세부주제를 가져야 함
       if (validItems.length === 0 && validSubsections.length === 0) {
-        Alert.alert('오류', `"${section.name}" 이름/주제에 최소 하나의 공통 기도제목 또는 세부 주제를 추가해주세요.`);
+        showError(`"${section.name}" 이름/주제에 최소 하나의 공통 기도제목 또는 세부 주제를 추가해주세요.`);
         return false;
       }
     }
@@ -237,6 +262,11 @@ export default function EditScreen({ navigation, initialData }: EditScreenProps)
 
     setSaveTitle(autoTitle);
     setShowSaveModal(true);
+    Animated.timing(modalOpacity, {
+      toValue: 1,
+      duration: 150,
+      useNativeDriver: true,
+    }).start();
   };
 
   const handleConfirmSave = async () => {
@@ -331,18 +361,25 @@ export default function EditScreen({ navigation, initialData }: EditScreenProps)
   const handleCancel = () => {
     if (hasChanges) {
       setShowExitModal(true);
+      Animated.timing(modalOpacity, {
+        toValue: 1,
+        duration: 150,
+        useNativeDriver: true,
+      }).start();
     } else {
       navigation.goBack();
     }
   };
 
   const handleConfirmExit = () => {
-    setShowExitModal(false);
-    navigation.goBack();
+    hideModal(() => {
+      setShowExitModal(false);
+      navigation.goBack();
+    });
   };
 
   const handleCancelExit = () => {
-    setShowExitModal(false);
+    hideModal(() => setShowExitModal(false));
   };
 
   const handleLoadData = async () => {
@@ -409,7 +446,14 @@ export default function EditScreen({ navigation, initialData }: EditScreenProps)
               <ChevronLeft className="w-6 h-6" color={getThemeColor(Colors.primary, isDarkMode)} />
             </TouchableOpacity>
             <TouchableOpacity
-              onPress={() => setShowLoadModal(true)}
+              onPress={() => {
+                setShowLoadModal(true);
+                Animated.timing(modalOpacity, {
+                  toValue: 1,
+                  duration: 150,
+                  useNativeDriver: true,
+                }).start();
+              }}
               className="rounded-lg"
             >
               <Download className="w-6 h-6" color={getThemeColor(Colors.primary, isDarkMode)} />
@@ -527,10 +571,10 @@ export default function EditScreen({ navigation, initialData }: EditScreenProps)
       <Modal
         visible={showSaveModal}
         transparent={true}
-        animationType="fade"
-        onRequestClose={() => !isSaving && setShowSaveModal(false)}
+        animationType="none"
+        onRequestClose={() => !isSaving && hideModal(() => setShowSaveModal(false))}
       >
-        <View className="flex-1 justify-center items-center bg-black/50">
+        <Animated.View style={{ flex: 1, opacity: modalOpacity }} className="justify-center items-center bg-black/50">
           <View className="bg-white dark:bg-neutral-800 rounded-2xl p-6 w-4/5 max-w-sm shadow-2xl">
             {isSaving ? (
               <>
@@ -552,22 +596,35 @@ export default function EditScreen({ navigation, initialData }: EditScreenProps)
                 >
                   기도제목 저장
                 </Text>
-                <Text
-                  className="text-gray-600 dark:text-gray-400 mb-2 text-center"
-                  style={{ fontSize: fontSize * 0.13 }}
-                >
-                  다음 제목으로 저장하시겠습니까?
-                </Text>
-                <Text
-                  className="text-gray-900 dark:text-white font-semibold mb-6 text-center"
-                  style={{ fontSize: fontSize * 0.15 }}
-                >
-                  "{saveTitle}"
-                </Text>
+                <View className="mb-2">
+                  <WrappedText
+                    containerStyle={{ alignItems: 'center', alignSelf: 'center' }}
+                    rowWrapperStyle={{ justifyContent: 'center' }}
+                    textStyle={{
+                      fontSize: fontSize * 0.13,
+                      color: colorScheme === 'dark' ? '#9ca3af' : '#4b5563',
+                    }}
+                  >
+                    다음 제목으로 저장하시겠습니까?
+                  </WrappedText>
+                </View>
+                <View className="mb-6">
+                  <WrappedText
+                    containerStyle={{ alignItems: 'center', alignSelf: 'center' }}
+                    rowWrapperStyle={{ justifyContent: 'center' }}
+                    textStyle={{
+                      fontSize: fontSize * 0.15,
+                      color: colorScheme === 'dark' ? '#ffffff' : '#111827',
+                      fontWeight: '600',
+                    }}
+                  >
+                    "{saveTitle}"
+                  </WrappedText>
+                </View>
 
                 <View className="flex-row gap-3">
                   <TouchableOpacity
-                    onPress={() => setShowSaveModal(false)}
+                    onPress={() => hideModal(() => setShowSaveModal(false))}
                     className="flex-1 bg-gray-200 dark:bg-neutral-700 rounded-lg py-3"
                   >
                     <Text
@@ -597,17 +654,17 @@ export default function EditScreen({ navigation, initialData }: EditScreenProps)
               </>
             )}
           </View>
-        </View>
+        </Animated.View>
       </Modal>
 
       {/* Load Confirmation Modal */}
       <Modal
         visible={showLoadModal}
         transparent={true}
-        animationType="fade"
-        onRequestClose={() => !isLoadingData && setShowLoadModal(false)}
+        animationType="none"
+        onRequestClose={() => !isLoadingData && hideModal(() => setShowLoadModal(false))}
       >
-        <View className="flex-1 justify-center items-center bg-black/50">
+        <Animated.View style={{ flex: 1, opacity: modalOpacity }} className="justify-center items-center bg-black/50">
           <View className="bg-white dark:bg-neutral-800 rounded-2xl p-6 w-4/5 max-w-sm shadow-2xl">
             {isLoadingData ? (
               <>
@@ -617,13 +674,30 @@ export default function EditScreen({ navigation, initialData }: EditScreenProps)
                 >
                   불러오는 중...
                 </Text>
-                <Text
-                  className="text-gray-600 dark:text-gray-400 mb-3 text-center"
-                  style={{ fontSize: fontSize * 0.13 }}
-                >
-                  기도제목을 불러오고 있어요.{'\n'}
-                  잠깐만 기다려주세요.
-                </Text>
+                <View className="mb-3 items-center">
+                  <WrappedText
+                    containerStyle={{ alignItems: 'center', alignSelf: 'center' }}
+                    rowWrapperStyle={{ justifyContent: 'center' }}
+                    textStyle={{
+                      fontSize: fontSize * 0.13,
+                      color: colorScheme === 'dark' ? '#9ca3af' : '#4b5563',
+                      textAlign: 'center',
+                    }}
+                  >
+                    기도제목을 불러오고 있어요.
+                  </WrappedText>
+                  <WrappedText
+                    containerStyle={{ alignItems: 'center', alignSelf: 'center' }}
+                    rowWrapperStyle={{ justifyContent: 'center' }}
+                    textStyle={{
+                      fontSize: fontSize * 0.13,
+                      color: colorScheme === 'dark' ? '#9ca3af' : '#4b5563',
+                      textAlign: 'center',
+                    }}
+                  >
+                    잠깐만 기다려주세요.
+                  </WrappedText>
+                </View>
                 <View className="items-center py-4">
                   <ActivityIndicator size="large" color={getThemeColor(Colors.primary, isDarkMode)} />
                 </View>
@@ -636,17 +710,34 @@ export default function EditScreen({ navigation, initialData }: EditScreenProps)
                 >
                   기도제목 불러오기
                 </Text>
-                <Text
-                  className="text-gray-600 dark:text-gray-400 mb-6 text-center"
-                  style={{ fontSize: fontSize * 0.13 }}
-                >
-                  마지막에 작성한 기도제목을 불러올까요?{'\n'}
-                  현재 작성 중인 내용은 모두 사라집니다.
-                </Text>
+                <View className="mb-6 items-center">
+                  <WrappedText
+                    containerStyle={{ alignItems: 'center', alignSelf: 'center' }}
+                    rowWrapperStyle={{ justifyContent: 'center' }}
+                    textStyle={{
+                      fontSize: fontSize * 0.13,
+                      color: colorScheme === 'dark' ? '#9ca3af' : '#4b5563',
+                      textAlign: 'center',
+                    }}
+                  >
+                    마지막에 작성한 기도제목을 불러올까요?
+                  </WrappedText>
+                  <WrappedText
+                    containerStyle={{ alignItems: 'center', alignSelf: 'center' }}
+                    rowWrapperStyle={{ justifyContent: 'center' }}
+                    textStyle={{
+                      fontSize: fontSize * 0.13,
+                      color: colorScheme === 'dark' ? '#9ca3af' : '#4b5563',
+                      textAlign: 'center',
+                    }}
+                  >
+                    현재 작성 중인 내용은 모두 사라집니다.
+                  </WrappedText>
+                </View>
 
                 <View className="flex-row gap-3">
                   <TouchableOpacity
-                    onPress={() => setShowLoadModal(false)}
+                    onPress={() => hideModal(() => setShowLoadModal(false))}
                     className="flex-1 bg-gray-200 dark:bg-neutral-700 rounded-lg py-3"
                   >
                     <Text
@@ -676,17 +767,17 @@ export default function EditScreen({ navigation, initialData }: EditScreenProps)
               </>
             )}
           </View>
-        </View>
+        </Animated.View>
       </Modal>
 
       {/* Exit Confirmation Modal */}
       <Modal
         visible={showExitModal}
         transparent={true}
-        animationType="fade"
+        animationType="none"
         onRequestClose={handleCancelExit}
       >
-        <View className="flex-1 justify-center items-center bg-black/50">
+        <Animated.View style={{ flex: 1, opacity: modalOpacity }} className="justify-center items-center bg-black/50">
           <View className="bg-white dark:bg-neutral-800 rounded-2xl p-6 w-4/5 max-w-sm shadow-2xl">
             <Text
               className="text-gray-900 dark:text-white font-semibold mb-3 text-center"
@@ -694,13 +785,30 @@ export default function EditScreen({ navigation, initialData }: EditScreenProps)
             >
               편집 취소
             </Text>
-            <Text
-              className="text-gray-600 dark:text-gray-400 mb-6 text-center"
-              style={{ fontSize: fontSize * 0.13 }}
-            >
-              작성 중인 내용이 모두 초기화됩니다.{'\n'}
-              정말 나가시겠습니까?
-            </Text>
+            <View className="mb-6 items-center">
+              <WrappedText
+                containerStyle={{ alignItems: 'center', alignSelf: 'center' }}
+                rowWrapperStyle={{ justifyContent: 'center' }}
+                textStyle={{
+                  fontSize: fontSize * 0.13,
+                  color: colorScheme === 'dark' ? '#9ca3af' : '#4b5563',
+                  textAlign: 'center',
+                }}
+              >
+                작성 중인 내용이 모두 초기화됩니다.
+              </WrappedText>
+              <WrappedText
+                containerStyle={{ alignItems: 'center', alignSelf: 'center' }}
+                rowWrapperStyle={{ justifyContent: 'center' }}
+                textStyle={{
+                  fontSize: fontSize * 0.13,
+                  color: colorScheme === 'dark' ? '#9ca3af' : '#4b5563',
+                  textAlign: 'center',
+                }}
+              >
+                정말 나가시겠습니까?
+              </WrappedText>
+            </View>
 
             <View className="flex-row gap-3">
               <TouchableOpacity
@@ -728,7 +836,55 @@ export default function EditScreen({ navigation, initialData }: EditScreenProps)
               </TouchableOpacity>
             </View>
           </View>
-        </View>
+        </Animated.View>
+      </Modal>
+
+      {/* Error Modal */}
+      <Modal
+        visible={showErrorModal}
+        transparent={true}
+        animationType="none"
+        onRequestClose={() => hideModal(() => setShowErrorModal(false))}
+      >
+        <Animated.View style={{ flex: 1, opacity: modalOpacity }} className="justify-center items-center bg-black/50">
+          <View className="bg-white dark:bg-neutral-800 rounded-2xl p-6 w-4/5 max-w-sm shadow-2xl">
+            <Text
+              className="text-gray-900 dark:text-white font-semibold mb-3 text-center"
+              style={{ fontSize: fontSize * 0.16 }}
+            >
+              오류
+            </Text>
+            <View className="mb-6">
+              <WrappedText
+                containerStyle={{ alignItems: 'center', alignSelf: 'center' }}
+                rowWrapperStyle={{ justifyContent: 'center' }}
+                textStyle={{
+                  fontSize: fontSize * 0.14,
+                  color: colorScheme === 'dark' ? '#9ca3af' : '#4b5563',
+                  textAlign: 'center',
+                }}
+              >
+                {errorMessage}
+              </WrappedText>
+            </View>
+
+            <TouchableOpacity
+              onPress={() => hideModal(() => setShowErrorModal(false))}
+              className="rounded-lg py-3"
+              style={{ backgroundColor: getThemeColor(Colors.button.background, isDarkMode) }}
+            >
+              <Text
+                className="text-center font-semibold"
+                style={{
+                  fontSize: fontSize * 0.14,
+                  color: getThemeColor(Colors.button.text, isDarkMode)
+                }}
+              >
+                확인
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </Animated.View>
       </Modal>
     </SafeAreaView>
   );
