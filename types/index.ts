@@ -3,10 +3,18 @@ export interface PrayerItem {
   content: string;
 }
 
+export interface PrayerSubsection {
+  id: string;
+  name: string;
+  items: PrayerItem[];
+  isNew?: boolean;
+}
+
 export interface PrayerSection {
   id: string;
   name: string;
   items: PrayerItem[];
+  subsections?: PrayerSubsection[];
 }
 
 export interface PrayerData {
@@ -30,11 +38,19 @@ export interface EditablePrayerSection {
   id: string;
   name: string;
   items: EditablePrayerItem[];
+  subsections: EditablePrayerSubsection[];
   isNew?: boolean;
 }
 
 export interface EditablePrayerItem {
   id: string;
   content: string;
+  isNew?: boolean;
+}
+
+export interface EditablePrayerSubsection {
+  id: string;
+  name: string;
+  items: EditablePrayerItem[];
   isNew?: boolean;
 }

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,7 @@ import {
   Modal,
   ActivityIndicator,
   DeviceEventEmitter,
+  BackHandler,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
@@ -21,7 +22,7 @@ import { useAudio } from '../contexts/AudioContext';
 import { useFontSize } from '../contexts/FontSizeContext';
 import { useTheme } from '../hooks/useTheme';
 import { usePrayers, PrayerData } from '../hooks/usePrayers';
-import { EditablePrayerData, EditablePrayerSection, EditablePrayerItem } from '../types';
+import { EditablePrayerData, EditablePrayerSection, EditablePrayerSubsection } from '../types';
 import PrayerSectionEditor from '../components/PrayerSectionEditor';
 import DateSelector from '../components/DateSelector';
 import { Colors, getThemeColor } from '../constants/Colors';
@@ -38,16 +39,17 @@ export default function EditScreen({ navigation, initialData }: EditScreenProps)
   const { fontSize } = useFontSize();
   const { isDarkMode } = useTheme();
   const { uploadPrayer, fetchLatestPrayer, loading } = usePrayers();
-  const [scrollEnabled, setScrollEnabled] = useState(true);
-  const [dummyHeight, setDummyHeight] = useState(0);
+  const [scrollState, setScrollState] = useState({ enabled: true, dummyHeight: 0 });
   const scrollViewRef = useRef<ScrollView>(null);
   const isAtBottomRef = useRef(false);
   const [showExitModal, setShowExitModal] = useState(false);
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [saveTitle, setSaveTitle] = useState('');
   const [showLoadModal, setShowLoadModal] = useState(false);
   const [isLoadingData, setIsLoadingData] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
+  const pendingDeleteLocksRef = useRef(0);
 
   // 편집 모드 진입/나갈 때 음악 상태 관리
   useEffect(() => {
@@ -62,9 +64,28 @@ export default function EditScreen({ navigation, initialData }: EditScreenProps)
       }
     };
   }, []);
+
+
+  useEffect(() => {
+    const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (hasChanges) {
+        setShowExitModal(true);
+        return true;
+      }
+      return false;
+    });
+
+    return () => backHandler.remove();
+  }, [hasChanges]);
   const [prayerData, setPrayerData] = useState<EditablePrayerData>(() => {
     if (initialData) {
-      return initialData;
+      return {
+        ...initialData,
+        sections: initialData.sections.map(section => ({
+          ...section,
+          subsections: section.subsections ?? [],
+        })),
+      };
     }
 
     const baseTimestamp = Date.now();
@@ -75,11 +96,8 @@ export default function EditScreen({ navigation, initialData }: EditScreenProps)
         {
           id: `section-${baseTimestamp}`,
           name: '',
-          items: Array.from({ length: 5 }, (_, i) => ({
-            id: `item-${baseTimestamp}-${i}`,
-            content: '',
-            isNew: true,
-          })),
+          items: [],
+          subsections: [],
           isNew: true,
         },
       ],
@@ -88,6 +106,7 @@ export default function EditScreen({ navigation, initialData }: EditScreenProps)
 
   const generateSectionId = () => `section-${Date.now()}-${Math.random()}`;
   const generateItemId = () => `item-${Date.now()}-${Math.random()}`;
+  const generateSubsectionId = () => `subsection-${Date.now()}-${Math.random()}`;
 
   // PrayerData를 EditablePrayerData로 변환
   const convertToEditableData = (data: PrayerData): EditablePrayerData => {
@@ -96,12 +115,22 @@ export default function EditScreen({ navigation, initialData }: EditScreenProps)
     return {
       title: data.title,
       date: new Date().toISOString().split('T')[0], // 현재 날짜로 설정
-      sections: data.sections.map((section, sectionIndex) => ({
+      sections: (data.sections ?? []).map((section, sectionIndex) => ({
         id: `section-${baseTimestamp}-${sectionIndex}`,
         name: section.name,
-        items: section.items.map((item, itemIndex) => ({
+        items: (section.items ?? []).map((item, itemIndex) => ({
           id: `item-${baseTimestamp}-${sectionIndex}-${itemIndex}`,
           content: item,
+          isNew: false,
+        })),
+        subsections: (section.subsections ?? []).map((subsection, subsectionIndex) => ({
+          id: `subsection-${baseTimestamp}-${sectionIndex}-${subsectionIndex}`,
+          name: subsection.name,
+          items: (subsection.items ?? []).map((item, itemIndex) => ({
+            id: `sub-item-${baseTimestamp}-${sectionIndex}-${subsectionIndex}-${itemIndex}`,
+            content: item,
+            isNew: false,
+          })),
           isNew: false,
         })),
         isNew: false,
@@ -110,15 +139,11 @@ export default function EditScreen({ navigation, initialData }: EditScreenProps)
   };
 
   const addSection = () => {
-    const baseTimestamp = Date.now();
     const newSection: EditablePrayerSection = {
       id: generateSectionId(),
       name: '',
-      items: Array.from({ length: 5 }, (_, i) => ({
-        id: `item-${baseTimestamp}-${i}`,
-        content: '',
-        isNew: true,
-      })),
+      items: [],
+      subsections: [],
       isNew: true,
     };
 
@@ -129,26 +154,28 @@ export default function EditScreen({ navigation, initialData }: EditScreenProps)
     setHasChanges(true);
   };
 
-  const handleDeleteStart = (height: number) => {
-    // Disable scroll during delete animation
-    setScrollEnabled(false);
+  const handleDeleteStart = useCallback((height: number) => {
+    pendingDeleteLocksRef.current += 1;
 
-    // If at bottom, add dummy space to maintain scroll position
-    if (isAtBottomRef.current) {
-      setDummyHeight(height);
+    // 상태 업데이트를 하나로 통합하여 리렌더링 최소화
+    setScrollState(prev => ({
+      enabled: false,
+      dummyHeight: isAtBottomRef.current && height > 0 ? prev.dummyHeight + height : prev.dummyHeight,
+    }));
+  }, []);
+
+  const handleDeleteEnd = useCallback(() => {
+    pendingDeleteLocksRef.current = Math.max(0, pendingDeleteLocksRef.current - 1);
+    if (pendingDeleteLocksRef.current === 0) {
+      setScrollState(prev => ({ ...prev, enabled: true }));
     }
-  };
+  }, []);
 
   const removeSection = (sectionId: string) => {
     setPrayerData(prev => ({
       ...prev,
       sections: prev.sections.filter(section => section.id !== sectionId),
     }));
-
-    // Re-enable scroll after deletion
-    setTimeout(() => {
-      setScrollEnabled(true);
-    }, 100);
     // Dummy will be removed when user scrolls away from bottom (see onScroll)
   };
 
@@ -164,19 +191,33 @@ export default function EditScreen({ navigation, initialData }: EditScreenProps)
 
   const validateData = (): boolean => {
     if (prayerData.sections.length === 0) {
-      Alert.alert('오류', '최소 하나의 기도제목 섹션을 추가해주세요.');
+      Alert.alert('오류', '최소 하나의 이름/주제를 추가해주세요.');
       return false;
     }
 
     for (const section of prayerData.sections) {
       if (!section.name.trim()) {
-        Alert.alert('오류', '모든 섹션 제목을 입력해주세요.');
+        Alert.alert('오류', '모든 이름/주제를 입력해주세요.');
         return false;
       }
 
+      // 유효한 items 개수 확인
       const validItems = section.items.filter(item => item.content.trim());
-      if (validItems.length === 0) {
-        Alert.alert('오류', `"${section.name}" 섹션에 최소 하나의 기도제목을 입력해주세요.`);
+
+      // 유효한 subsections 개수 확인 (name이 있는 subsection만 유효)
+      const validSubsections = (section.subsections ?? []).filter(subsection => subsection.name.trim());
+
+      // Subsection이 있다면 name은 필수
+      for (const subsection of section.subsections ?? []) {
+        if (!subsection.name.trim()) {
+          Alert.alert('오류', `"${section.name}" 이름/주제의 세부 주제 이름을 모두 입력해주세요.`);
+          return false;
+        }
+      }
+
+      // Section은 최소 1개의 기도제목 또는 1개의 유효한 세부주제를 가져야 함
+      if (validItems.length === 0 && validSubsections.length === 0) {
+        Alert.alert('오류', `"${section.name}" 이름/주제에 최소 하나의 공통 기도제목 또는 세부 주제를 추가해주세요.`);
         return false;
       }
     }
@@ -186,6 +227,15 @@ export default function EditScreen({ navigation, initialData }: EditScreenProps)
 
   const handleSave = () => {
     if (!validateData()) return;
+
+    // 저장될 제목 미리 생성
+    const dateParts = prayerData.date.split('-');
+    const year = dateParts[0];
+    const month = parseInt(dateParts[1], 10);
+    const day = parseInt(dateParts[2], 10);
+    const autoTitle = `${year}년 ${month}월 ${day}일 기도제목`;
+
+    setSaveTitle(autoTitle);
     setShowSaveModal(true);
   };
 
@@ -197,20 +247,52 @@ export default function EditScreen({ navigation, initialData }: EditScreenProps)
       sections: prayerData.sections.map(section => ({
         ...section,
         items: section.items.filter(item => item.content.trim()),
+        subsections: (section.subsections ?? [])
+          .map(subsection => ({
+            ...subsection,
+            items: subsection.items.filter(item => item.content.trim()),
+          }))
+          .filter(subsection => subsection.items.length > 0 && subsection.name.trim()),
       })),
     };
 
-    // 날짜 기반 제목 자동 생성 (예: "기도제목(2025.10.03)")
-    const formattedDate = prayerData.date.replace(/-/g, '.');
-    const autoTitle = `기도제목(${formattedDate})`;
+    // 날짜 기반 제목 자동 생성 (예: "2025년 1월 9일 기도제목")
+    const dateParts = prayerData.date.split('-');
+    const year = dateParts[0];
+    const month = parseInt(dateParts[1], 10);
+    const day = parseInt(dateParts[2], 10);
+    const autoTitle = `${year}년 ${month}월 ${day}일 기도제목`;
 
     // EditablePrayerData를 PrayerData 형식으로 변환
     const prayerDataToUpload: PrayerData = {
       title: autoTitle,
-      sections: cleanedData.sections.map(section => ({
-        name: section.name,
-        items: section.items.map(item => item.content),
-      })),
+      sections: cleanedData.sections.map(section => {
+        const payload: PrayerData['sections'][number] = {
+          name: section.name,
+        };
+
+        const sectionItems = section.items
+          .map(item => item.content.trim())
+          .filter(content => content.length > 0);
+        if (sectionItems.length > 0) {
+          payload.items = sectionItems;
+        }
+
+        const subsectionPayload = (section.subsections ?? [])
+          .map(subsection => ({
+            name: subsection.name,
+            items: subsection.items
+              .map(item => item.content.trim())
+              .filter(content => content.length > 0),
+          }))
+          .filter(subsection => subsection.items.length > 0);
+
+        if (subsectionPayload.length > 0) {
+          payload.subsections = subsectionPayload;
+        }
+
+        return payload;
+      }),
       // TODO(0913vision): Add verse input fields (text and reference) in EditScreen UI
       verse: {
         text: '',
@@ -360,7 +442,7 @@ export default function EditScreen({ navigation, initialData }: EditScreenProps)
         contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 24 }}
         bottomOffset={120}
         style={{ flex: 1 }}
-        scrollEnabled={scrollEnabled}
+        scrollEnabled={scrollState.enabled}
         onScroll={(e) => {
           const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
           const scrollY = contentOffset.y;
@@ -373,15 +455,15 @@ export default function EditScreen({ navigation, initialData }: EditScreenProps)
           isAtBottomRef.current = isNearBottom;
 
           // If dummy exists, check if removing it would cause scroll adjustment
-          if (dummyHeight > 0) {
+          if (scrollState.dummyHeight > 0) {
             // Calculate max scroll position after dummy removal
-            const newContentHeight = totalContentHeight - dummyHeight;
+            const newContentHeight = totalContentHeight - scrollState.dummyHeight;
             const newMaxScrollY = Math.max(0, newContentHeight - viewHeight);
 
             // If current scroll position is still valid after dummy removal, remove it
             // (i.e., current scroll doesn't exceed the new max scroll position)
             if (scrollY <= newMaxScrollY) {
-              setDummyHeight(0);
+              setScrollState(prev => ({ ...prev, dummyHeight: 0 }));
             }
           }
         }}
@@ -410,6 +492,7 @@ export default function EditScreen({ navigation, initialData }: EditScreenProps)
               onUpdate={(updatedSection) => updateSection(section.id, updatedSection)}
               onRemove={() => removeSection(section.id)}
               onDeleteStart={handleDeleteStart}
+              onDeleteEnd={handleDeleteEnd}
               canRemove={prayerData.sections.length > 1}
             />
           ))}
@@ -431,13 +514,13 @@ export default function EditScreen({ navigation, initialData }: EditScreenProps)
               className="text-gray-500 dark:text-gray-400"
               style={{ fontSize: fontSize * 0.16 }}
             >
-              + 기도제목소단위 추가
+              + 이름/주제 추가
             </Text>
           </TouchableOpacity>
         </View>
 
         {/* Dummy spacer to maintain scroll position when deleting at bottom */}
-        {dummyHeight > 0 && <View style={{ height: dummyHeight }} />}
+        {scrollState.dummyHeight > 0 && <View style={{ height: scrollState.dummyHeight }} />}
       </KeyboardAwareScrollView>
 
       {/* Save Confirmation Modal */}
@@ -470,10 +553,16 @@ export default function EditScreen({ navigation, initialData }: EditScreenProps)
                   기도제목 저장
                 </Text>
                 <Text
-                  className="text-gray-600 dark:text-gray-400 mb-6 text-center"
+                  className="text-gray-600 dark:text-gray-400 mb-2 text-center"
                   style={{ fontSize: fontSize * 0.13 }}
                 >
-                  작성한 기도제목을 저장하시겠습니까?
+                  다음 제목으로 저장하시겠습니까?
+                </Text>
+                <Text
+                  className="text-gray-900 dark:text-white font-semibold mb-6 text-center"
+                  style={{ fontSize: fontSize * 0.15 }}
+                >
+                  "{saveTitle}"
                 </Text>
 
                 <View className="flex-row gap-3">

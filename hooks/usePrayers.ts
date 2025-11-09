@@ -9,9 +9,15 @@ export interface PrayerVerse {
   reference: string;
 }
 
-export interface PrayerSection {
+export interface PrayerSubsection {
   name: string;
   items: string[];
+}
+
+export interface PrayerSection {
+  name: string;
+  items?: string[];
+  subsections?: PrayerSubsection[];
 }
 
 export interface PrayerData {
@@ -30,6 +36,48 @@ export interface PrayerRecord {
   created_at: string;
 }
 
+const normalizeItems = (items: unknown): string[] => {
+  if (!Array.isArray(items)) return [];
+  return items
+    .map(item => (typeof item === 'string' ? item : ''))
+    .filter(item => item.trim().length > 0);
+};
+
+const normalizeSubsections = (subsections: unknown): PrayerSubsection[] => {
+  if (!Array.isArray(subsections)) return [];
+  return subsections
+    .map(subsection => {
+      const fallbackName = typeof subsection?.name === 'string' ? subsection.name : '';
+      const normalizedItems = normalizeItems(subsection?.items);
+      return {
+        name: fallbackName,
+        items: normalizedItems,
+      };
+    })
+    .filter(subsection => subsection.items.length > 0);
+};
+
+const normalizeSections = (sections: unknown): PrayerSection[] => {
+  if (!Array.isArray(sections)) return [];
+  return sections.map(section => {
+    const normalizedSection: PrayerSection = {
+      name: typeof section?.name === 'string' ? section.name : '',
+    };
+
+    const normalizedItems = normalizeItems(section?.items);
+    if (normalizedItems.length > 0) {
+      normalizedSection.items = normalizedItems;
+    }
+
+    const normalizedSubsections = normalizeSubsections(section?.subsections);
+    if (normalizedSubsections.length > 0) {
+      normalizedSection.subsections = normalizedSubsections;
+    }
+
+    return normalizedSection;
+  });
+};
+
 export function usePrayers() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -38,12 +86,19 @@ export function usePrayers() {
   const loadCachedData = useCallback(async (): Promise<PrayerData | null> => {
     try {
       const cached = await AsyncStorage.getItem(CACHE_KEY);
-      return cached ? JSON.parse(cached) : null;
+      if (!cached) return null;
+
+      const parsed = JSON.parse(cached);
+      return {
+        title: parsed?.title ?? '',
+        sections: normalizeSections(parsed?.sections),
+        verse: parsed?.verse ?? { text: '', reference: '' },
+      };
     } catch (err) {
       console.error('Error loading cached data:', err);
       return null;
     }
-  }, []);
+  }, [normalizeSections]);
 
   // 캐시에 데이터 저장
   const saveCachedData = useCallback(async (data: PrayerData): Promise<void> => {
@@ -87,8 +142,8 @@ export function usePrayers() {
 
       const prayerData: PrayerData = {
         title: data.title,
-        sections: data.content.sections,
-        verse: data.content.verse,
+        sections: normalizeSections(data.content?.sections),
+        verse: data.content?.verse ?? { text: '', reference: '' },
       };
 
       // 데이터를 캐시에 저장

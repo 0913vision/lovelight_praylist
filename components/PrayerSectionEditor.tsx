@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, Modal } from 'react-native';
 import Animated, {
   useAnimatedStyle,
@@ -8,11 +8,12 @@ import Animated, {
   runOnJS,
   Easing,
 } from 'react-native-reanimated';
-import { EditablePrayerSection, EditablePrayerItem } from '../types';
+import { EditablePrayerSection, EditablePrayerItem, EditablePrayerSubsection } from '../types';
 import { useTheme } from '../hooks/useTheme';
 import { Trash2 } from 'lucide-react-native';
 import { useFontSize } from '../contexts/FontSizeContext';
 import PrayerItemEditor from './PrayerItemEditor';
+import PrayerSubsectionEditor from './PrayerSubsectionEditor';
 import { Colors, getThemeColor } from '../constants/Colors';
 
 interface PrayerSectionEditorProps {
@@ -22,6 +23,7 @@ interface PrayerSectionEditorProps {
   onRemove: () => void;
   canRemove: boolean;
   onDeleteStart?: (height: number) => void;
+  onDeleteEnd?: () => void;
 }
 
 export default function PrayerSectionEditor({
@@ -31,11 +33,14 @@ export default function PrayerSectionEditor({
   onRemove,
   canRemove,
   onDeleteStart,
+  onDeleteEnd,
 }: PrayerSectionEditorProps) {
   const { isDarkMode } = useTheme();
   const { fontSize } = useFontSize();
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [containerHeight, setContainerHeight] = useState(0);
+  const containerRef = useRef<View>(null);
+  const currentHeightRef = useRef(0);
+  const isDeletingRef = useRef(false);
 
   // Reanimated shared values
   const translateX = useSharedValue(0);
@@ -44,6 +49,7 @@ export default function PrayerSectionEditor({
   const marginBottom = useSharedValue(24);
 
   const generateItemId = () => `item-${Date.now()}-${Math.random()}`;
+  const generateSubsectionId = () => `subsection-${Date.now()}-${Math.random()}`;
 
   const updateSectionName = (name: string) => {
     onUpdate({ ...section, name });
@@ -59,6 +65,36 @@ export default function PrayerSectionEditor({
     onUpdate({
       ...section,
       items: [...section.items, newItem],
+    });
+  };
+
+  const addSubsection = () => {
+    const newSubsection: EditablePrayerSubsection = {
+      id: generateSubsectionId(),
+      name: '',
+      items: [],
+      isNew: true,
+    };
+
+    onUpdate({
+      ...section,
+      subsections: [...(section.subsections ?? []), newSubsection],
+    });
+  };
+
+  const removeSubsection = (subsectionId: string) => {
+    onUpdate({
+      ...section,
+      subsections: (section.subsections ?? []).filter(subsection => subsection.id !== subsectionId),
+    });
+  };
+
+  const updateSubsection = (subsectionId: string, updatedSubsection: EditablePrayerSubsection) => {
+    onUpdate({
+      ...section,
+      subsections: (section.subsections ?? []).map(subsection =>
+        subsection.id === subsectionId ? updatedSubsection : subsection
+      ),
     });
   };
 
@@ -78,52 +114,88 @@ export default function PrayerSectionEditor({
     });
   };
 
+  const notifyChildDeleteStart = (height: number) => {
+    if (height > 0) {
+      onDeleteStart?.(height);
+    }
+  };
+
+  const finalizeRemoval = () => {
+    onRemove();
+    onDeleteEnd?.();
+  };
+
+  const startDeleteAnimation = () => {
+    isDeletingRef.current = true;
+
+    // 삭제 시작 시점에 실시간으로 높이 측정
+    containerRef.current?.measure((_x, _y, _width, height) => {
+      const totalHeight = height + 24; // height + marginBottom
+
+      // 애니메이션 시작 전 높이 고정
+      if (animatedHeight.value === null) {
+        animatedHeight.value = currentHeightRef.current || height;
+      }
+
+      // 부모에게 삭제 시작 알림
+      onDeleteStart?.(totalHeight);
+
+      // 통일된 타이밍: 280ms slide + 220ms collapse
+      translateX.value = withTiming(-400, {
+        duration: 280,
+        easing: Easing.bezier(0.25, 0.1, 0.25, 1)
+      });
+      opacity.value = withTiming(0, {
+        duration: 280,
+        easing: Easing.bezier(0.25, 0.1, 0.25, 1)
+      }, (finished) => {
+        if (finished) {
+          // Step 2: Collapse height and margin smoothly
+          if (animatedHeight.value !== null) {
+            animatedHeight.value = withTiming(0, {
+              duration: 220,
+              easing: Easing.bezier(0.25, 0.1, 0.25, 1)
+            });
+          }
+          marginBottom.value = withTiming(0, {
+            duration: 220,
+            easing: Easing.bezier(0.25, 0.1, 0.25, 1)
+          }, (finished) => {
+            if (finished) {
+              // Step 3: Trigger removal on JS thread
+              runOnJS(finalizeRemoval)();
+            }
+          });
+        }
+      });
+    });
+  };
+
   const handleDeletePress = () => {
     if (!canRemove) return;
+
+    // 이름/주제와 모든 기도제목, 모든 세부주제가 비어있는지 확인
+    const hasName = section.name.trim();
+    const hasItems = section.items.some(item => item.content.trim());
+    const hasSubsections = (section.subsections ?? []).some(subsection => {
+      const hasSubName = subsection.name.trim();
+      const hasSubItems = subsection.items.some(item => item.content.trim());
+      return hasSubName || hasSubItems;
+    });
+
+    // 모든 내용이 비어있으면 바로 삭제
+    if (!hasName && !hasItems && !hasSubsections) {
+      startDeleteAnimation();
+      return;
+    }
+
+    // 내용이 있으면 확인 모달 표시
     setShowDeleteModal(true);
   };
 
   const handleConfirmDelete = () => {
     setShowDeleteModal(false);
-
-    // Set initial height if not set
-    if (animatedHeight.value === null && containerHeight > 0) {
-      animatedHeight.value = containerHeight;
-    }
-
-    // Notify parent to disable scroll and add dummy if needed
-    if (containerHeight > 0) {
-      onDeleteStart?.(containerHeight + 24); // height + marginBottom
-    }
-
-    // Step 1: Slide left and fade out
-    translateX.value = withTiming(-400, {
-      duration: 280,
-      easing: Easing.bezier(0.25, 0.1, 0.25, 1)
-    });
-    opacity.value = withTiming(0, {
-      duration: 280,
-      easing: Easing.bezier(0.25, 0.1, 0.25, 1)
-    }, (finished) => {
-      if (finished) {
-        // Step 2: Collapse height and margin smoothly
-        if (animatedHeight.value !== null) {
-          animatedHeight.value = withTiming(0, {
-            duration: 220,
-            easing: Easing.bezier(0.25, 0.1, 0.25, 1)
-          });
-        }
-        marginBottom.value = withTiming(0, {
-          duration: 220,
-          easing: Easing.bezier(0.25, 0.1, 0.25, 1)
-        }, (finished) => {
-          if (finished) {
-            // Step 3: Trigger removal on JS thread
-            runOnJS(onRemove)();
-          }
-        });
-      }
-    });
+    startDeleteAnimation();
   };
 
   const animatedStyle = useAnimatedStyle(() => ({
@@ -141,10 +213,11 @@ export default function PrayerSectionEditor({
   return (
     <>
       <Animated.View
+        ref={containerRef}
         style={animatedStyle}
         onLayout={(e) => {
-          if (containerHeight === 0) {
-            setContainerHeight(e.nativeEvent.layout.height);
+          if (!isDeletingRef.current) {
+            currentHeightRef.current = e.nativeEvent.layout.height;
           }
         }}
       >
@@ -154,7 +227,7 @@ export default function PrayerSectionEditor({
             <TextInput
               value={section.name}
               onChangeText={updateSectionName}
-              placeholder={`소제목 (필수) (예: 홍길동)`}
+              placeholder={`이름 또는 주제 (필수, 예: 홍길동)`}
               className="flex-1 border border-gray-300 dark:border-neutral-600 rounded-lg px-3 py-2 text-gray-900 dark:text-white bg-white dark:bg-neutral-700"
               placeholderTextColor={getThemeColor(Colors.text.placeholder, isDarkMode)}
               style={{ fontSize: fontSize * 0.14 }}
@@ -175,16 +248,24 @@ export default function PrayerSectionEditor({
 
           {/* Prayer Items */}
           <View>
+            <Text
+              className="text-sm text-gray-600 dark:text-gray-400 mb-2"
+              style={{ fontSize: fontSize * 0.13 }}
+            >
+              공통 기도제목
+            </Text>
             {section.items.map((item, index) => (
               <PrayerItemEditor
                 key={item.id}
                 item={item}
                 itemIndex={index + 1}
                 onUpdate={(updatedItem) => updateItem(item.id, updatedItem)}
-                onRemove={() => removeItem(item.id)}
-                canRemove={section.items.length > 1}
-              />
-            ))}
+              onRemove={() => removeItem(item.id)}
+              canRemove={section.items.length > 0}
+              onDeleteStart={notifyChildDeleteStart}
+              onDeleteEnd={onDeleteEnd}
+            />
+          ))}
 
             {/* Add Item Button */}
             <TouchableOpacity
@@ -203,7 +284,51 @@ export default function PrayerSectionEditor({
                 className="text-gray-500 dark:text-gray-400"
                 style={{ fontSize: fontSize * 0.14 }}
               >
-                + 기도제목 추가
+                + 공통 기도제목 추가
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Subsections */}
+          <View className="mt-4">
+            <Text
+              className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+              style={{ fontSize: fontSize * 0.13 }}
+            >
+              세부 주제
+            </Text>
+
+            {(section.subsections ?? []).length === 0 ? null : (
+              section.subsections?.map((subsection, idx) => (
+                <PrayerSubsectionEditor
+                  key={subsection.id}
+                  subsection={subsection}
+                  subsectionIndex={idx + 1}
+                  onUpdate={(updated) => updateSubsection(subsection.id, updated)}
+                  onRemove={() => removeSubsection(subsection.id)}
+                  onDeleteStart={notifyChildDeleteStart}
+                  onDeleteEnd={onDeleteEnd}
+                />
+              ))
+            )}
+
+            <TouchableOpacity
+              onPress={addSubsection}
+              className="rounded-lg items-center justify-center mt-3"
+              style={{
+                backgroundColor: 'transparent',
+                borderWidth: 0.8,
+                borderStyle: 'dashed',
+                borderColor: getThemeColor(Colors.border, isDarkMode),
+                borderRadius: 8,
+                paddingVertical: 8
+              }}
+            >
+              <Text
+                className="text-gray-500 dark:text-gray-400"
+                style={{ fontSize: fontSize * 0.14 }}
+              >
+                + 세부 주제 추가
               </Text>
             </TouchableOpacity>
           </View>
@@ -223,14 +348,14 @@ export default function PrayerSectionEditor({
               className="text-gray-900 dark:text-white font-semibold mb-3 text-center"
               style={{ fontSize: fontSize * 0.16 }}
             >
-              섹션 삭제
+              이름/주제 삭제
             </Text>
             <Text
               className="text-gray-600 dark:text-gray-400 mb-6 text-center"
               style={{ fontSize: fontSize * 0.13 }}
             >
-              이 섹션을 삭제하시겠습니까?{'\n'}
-              섹션 내 모든 기도제목이 함께 삭제됩니다.
+              이 이름/주제를 삭제할까요?{'\n'}
+              공통 기도제목과 세부 주제가 모두 지워집니다.
             </Text>
 
             <View className="flex-row gap-3">
