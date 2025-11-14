@@ -42,9 +42,10 @@ export default function EditScreen({ navigation, initialData }: EditScreenProps)
   const { isDarkMode } = useTheme();
   const { colorScheme } = useColorScheme();
   const { uploadPrayer, fetchLatestPrayer, loading } = usePrayers();
-  const [scrollState, setScrollState] = useState({ enabled: true, dummyHeight: 0 });
+  const scrollStateRef = useRef({ enabled: true });
+  const [dummyHeight, setDummyHeight] = useState(0);
   const scrollViewRef = useRef<ScrollView>(null);
-  const isAtBottomRef = useRef(false);
+  const scrollInfoRef = useRef({ scrollY: 0, contentHeight: 0, viewHeight: 0 });
   const [showExitModal, setShowExitModal] = useState(false);
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -164,29 +165,33 @@ export default function EditScreen({ navigation, initialData }: EditScreenProps)
   const handleDeleteStart = useCallback((height: number) => {
     pendingDeleteLocksRef.current += 1;
 
-    // 상태 업데이트를 하나로 통합하여 리렌더링 최소화
-    setScrollState(prev => ({
-      enabled: false,
-      dummyHeight: isAtBottomRef.current && height > 0 ? prev.dummyHeight + height : prev.dummyHeight,
-    }));
+    // 삭제 시작 시 스크롤 위치 체크하여 dummy 추가 여부 결정
+    const { scrollY, contentHeight, viewHeight } = scrollInfoRef.current;
+    const isNearBottom = scrollY + viewHeight >= contentHeight - 300;
+
+    scrollStateRef.current.enabled = false;
+
+    // dummy가 추가된 경우에만 state 업데이트 (spacer 표시용)
+    if (isNearBottom && height > 0) {
+      setDummyHeight(prev => prev + height);
+    }
   }, []);
 
   const handleDeleteEnd = useCallback(() => {
     pendingDeleteLocksRef.current = Math.max(0, pendingDeleteLocksRef.current - 1);
     if (pendingDeleteLocksRef.current === 0) {
-      setScrollState(prev => ({ ...prev, enabled: true }));
+      scrollStateRef.current.enabled = true;
     }
   }, []);
 
-  const removeSection = (sectionId: string) => {
+  const removeSection = useCallback((sectionId: string) => {
     setPrayerData(prev => ({
       ...prev,
       sections: prev.sections.filter(section => section.id !== sectionId),
     }));
-    // Dummy will be removed when user scrolls away from bottom (see onScroll)
-  };
+  }, []);
 
-  const updateSection = (sectionId: string, updatedSection: EditablePrayerSection) => {
+  const updateSection = useCallback((sectionId: string, updatedSection: EditablePrayerSection) => {
     setPrayerData(prev => ({
       ...prev,
       sections: prev.sections.map(section =>
@@ -194,7 +199,7 @@ export default function EditScreen({ navigation, initialData }: EditScreenProps)
       ),
     }));
     setHasChanges(true);
-  };
+  }, []);
 
   const showError = (message: string) => {
     setErrorMessage(message);
@@ -486,32 +491,33 @@ export default function EditScreen({ navigation, initialData }: EditScreenProps)
         contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 24 }}
         bottomOffset={120}
         style={{ flex: 1 }}
-        scrollEnabled={scrollState.enabled}
+        scrollEnabled={scrollStateRef.current.enabled}
+        removeClippedSubviews={true}
         onScroll={(e) => {
-          const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
-          const scrollY = contentOffset.y;
-          const viewHeight = layoutMeasurement.height;
-          const totalContentHeight = contentSize.height;
+          // 스크롤 위치만 저장 (계산 없음)
+          scrollInfoRef.current = {
+            scrollY: e.nativeEvent.contentOffset.y,
+            contentHeight: e.nativeEvent.contentSize.height,
+            viewHeight: e.nativeEvent.layoutMeasurement.height,
+          };
+        }}
+        scrollEventThrottle={100}
+        onScrollEndDrag={(e) => {
+          // 스크롤이 끝났을 때 dummy 제거 체크
+          if (dummyHeight > 0) {
+            const scrollY = e.nativeEvent.contentOffset.y;
+            const viewHeight = e.nativeEvent.layoutMeasurement.height;
+            const totalContentHeight = e.nativeEvent.contentSize.height;
 
-          // Check if we're in the bottom area where deletion would cause scroll adjustment
-          // More generous threshold: if we're within 300px of the bottom
-          const isNearBottom = scrollY + viewHeight >= totalContentHeight - 300;
-          isAtBottomRef.current = isNearBottom;
-
-          // If dummy exists, check if removing it would cause scroll adjustment
-          if (scrollState.dummyHeight > 0) {
-            // Calculate max scroll position after dummy removal
-            const newContentHeight = totalContentHeight - scrollState.dummyHeight;
+            const newContentHeight = totalContentHeight - dummyHeight;
             const newMaxScrollY = Math.max(0, newContentHeight - viewHeight);
 
-            // If current scroll position is still valid after dummy removal, remove it
-            // (i.e., current scroll doesn't exceed the new max scroll position)
+            // 현재 스크롤 위치가 dummy 제거 후에도 유효하면 제거
             if (scrollY <= newMaxScrollY) {
-              setScrollState(prev => ({ ...prev, dummyHeight: 0 }));
+              setDummyHeight(0);
             }
           }
         }}
-        scrollEventThrottle={16}
       >
         {/* Date Selector */}
         <DateSelector
@@ -533,8 +539,8 @@ export default function EditScreen({ navigation, initialData }: EditScreenProps)
               key={section.id}
               section={section}
               sectionIndex={index + 1}
-              onUpdate={(updatedSection) => updateSection(section.id, updatedSection)}
-              onRemove={() => removeSection(section.id)}
+              onUpdate={updateSection}
+              onRemove={removeSection}
               onDeleteStart={handleDeleteStart}
               onDeleteEnd={handleDeleteEnd}
               canRemove={prayerData.sections.length > 1}
@@ -564,7 +570,7 @@ export default function EditScreen({ navigation, initialData }: EditScreenProps)
         </View>
 
         {/* Dummy spacer to maintain scroll position when deleting at bottom */}
-        {scrollState.dummyHeight > 0 && <View style={{ height: scrollState.dummyHeight }} />}
+        {dummyHeight > 0 && <View style={{ height: dummyHeight }} />}
       </KeyboardAwareScrollView>
 
       {/* Save Confirmation Modal */}

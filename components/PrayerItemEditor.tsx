@@ -16,14 +16,14 @@ import Animated, {
 interface PrayerItemEditorProps {
   item: EditablePrayerItem;
   itemIndex: number;
-  onUpdate: (item: EditablePrayerItem) => void;
-  onRemove: () => void;
+  onUpdate: (itemId: string, item: EditablePrayerItem) => void;
+  onRemove: (itemId: string) => void;
   canRemove: boolean;
   onDeleteStart?: (height: number) => void;
   onDeleteEnd?: () => void;
 }
 
-export default function PrayerItemEditor({
+const PrayerItemEditor = React.memo(function PrayerItemEditor({
   item,
   itemIndex,
   onUpdate,
@@ -34,84 +34,91 @@ export default function PrayerItemEditor({
 }: PrayerItemEditorProps) {
   const { fontSize } = useFontSize();
   const { isDarkMode } = useTheme();
-  const [isRemoving, setIsRemoving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const containerRef = useRef<View>(null);
-  const currentHeightRef = useRef(0);
+  const cachedHeightRef = useRef(0);
 
   const translateX = useSharedValue(0);
   const opacity = useSharedValue(1);
   const animatedHeight = useSharedValue<number | null>(null);
   const marginBottom = useSharedValue(8);
 
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: translateX.value }],
-    opacity: opacity.value,
-    height: animatedHeight.value ?? undefined,
-    marginBottom: marginBottom.value,
-    overflow: 'hidden',
-  }));
+  const animatedStyle = useAnimatedStyle(() => {
+    'worklet';
+    if (!isDeleting) {
+      // 평소: 애니메이션 스타일 없음 (빈 객체)
+      return {};
+    }
+    // 삭제 중: 애니메이션 스타일 적용
+    return {
+      transform: [{ translateX: translateX.value }],
+      opacity: opacity.value,
+      height: animatedHeight.value ?? undefined,
+      marginBottom: marginBottom.value,
+      overflow: 'hidden',
+    };
+  }, [isDeleting]);
 
   const updateContent = (content: string) => {
-    onUpdate({ ...item, content });
+    onUpdate(item.id, { ...item, content });
   };
 
   const finalizeRemoval = () => {
-    onRemove();
+    onRemove(item.id);
     onDeleteEnd?.();
   };
 
   const iconColor = getThemeColor(Colors.icon.primary, isDarkMode);
 
   const startDeleteAnimation = () => {
-    // 삭제 시작 시점에 실시간으로 높이 측정
-    containerRef.current?.measure((_x, _y, _width, height) => {
-      const totalHeight = height + 8; // height + marginBottom
+    // 캐시된 높이 사용 (measure 호출 제거로 딜레이 제거)
+    const height = cachedHeightRef.current;
+    const totalHeight = height + 8; // height + marginBottom
 
-      // 애니메이션 시작 전 높이 고정
-      if (animatedHeight.value === null) {
-        animatedHeight.value = currentHeightRef.current || height;
-      }
+    // 높이 고정
+    animatedHeight.value = height;
 
-      // 부모에게 삭제 시작 알림
-      onDeleteStart?.(totalHeight);
+    // 부모에게 삭제 시작 알림
+    onDeleteStart?.(totalHeight);
 
-      // 통일된 타이밍: 280ms slide + 220ms collapse
-      translateX.value = withTiming(-400, {
-        duration: 280,
-        easing: Easing.bezier(0.25, 0.1, 0.25, 1),
-      });
-      opacity.value = withTiming(0, {
-        duration: 280,
-        easing: Easing.bezier(0.25, 0.1, 0.25, 1),
-      }, (finished) => {
-        if (!finished) return;
+    // Animated.View로 전환 + 즉시 애니메이션 시작
+    setIsDeleting(true);
 
-        if (animatedHeight.value !== null) {
-          animatedHeight.value = withTiming(0, {
-            duration: 220,
-            easing: Easing.bezier(0.25, 0.1, 0.25, 1),
-          });
-        }
+    // 즉시 애니메이션 시작
+    translateX.value = withTiming(-400, {
+      duration: 280,
+      easing: Easing.bezier(0.25, 0.1, 0.25, 1),
+    });
+    opacity.value = withTiming(0, {
+      duration: 280,
+      easing: Easing.bezier(0.25, 0.1, 0.25, 1),
+    }, (finished) => {
+      if (!finished) return;
 
-        marginBottom.value = withTiming(0, {
+      if (animatedHeight.value !== null) {
+        animatedHeight.value = withTiming(0, {
           duration: 220,
           easing: Easing.bezier(0.25, 0.1, 0.25, 1),
-        }, (collapsed) => {
-          if (collapsed) {
-            runOnJS(finalizeRemoval)();
-          }
         });
+      }
+
+      marginBottom.value = withTiming(0, {
+        duration: 220,
+        easing: Easing.bezier(0.25, 0.1, 0.25, 1),
+      }, (collapsed) => {
+        if (collapsed) {
+          runOnJS(finalizeRemoval)();
+        }
       });
     });
   };
 
   const handleRemovePress = () => {
-    if (!canRemove || isRemoving) return;
+    if (!canRemove || isDeleting) return;
 
     // 내용이 비어있으면 바로 삭제
     if (!item.content.trim()) {
-      setIsRemoving(true);
       startDeleteAnimation();
       return;
     }
@@ -122,7 +129,6 @@ export default function PrayerItemEditor({
 
   const handleConfirmDelete = () => {
     setShowDeleteModal(false);
-    setIsRemoving(true);
     startDeleteAnimation();
   };
 
@@ -130,56 +136,58 @@ export default function PrayerItemEditor({
     setShowDeleteModal(false);
   };
 
+  const content = (
+    <View className="flex-row items-center">
+      {/* Bullet Icon */}
+      <View className="w-5 mr-1 items-center">
+        <Diamond
+          size={fontSize * 0.08}
+          color={iconColor}
+          fill={iconColor}
+          strokeWidth={0}
+        />
+      </View>
+
+      {/* Item Input */}
+      <View className="flex-1">
+        <TextInput
+          value={item.content}
+          onChangeText={updateContent}
+          placeholder={`${itemIndex}번째 기도제목`}
+          className="border border-gray-300 dark:border-neutral-600 rounded-lg px-3 py-2 text-gray-900 dark:text-white bg-white dark:bg-neutral-700"
+          placeholderTextColor={getThemeColor(Colors.text.placeholder, isDarkMode)}
+          style={{ fontSize: fontSize * 0.14 }}
+          multiline
+        />
+      </View>
+
+      {/* Remove Button */}
+      <TouchableOpacity
+        onPress={handleRemovePress}
+        disabled={!canRemove || isDeleting}
+        className="ml-2 p-1"
+      >
+        <Trash2
+          size={fontSize*0.14}
+          color={canRemove ? getThemeColor(Colors.status.error, isDarkMode) : getThemeColor(Colors.status.disabled, isDarkMode)}
+          strokeWidth={1.5}
+          opacity={canRemove ? 1 : 0.6}
+        />
+      </TouchableOpacity>
+    </View>
+  );
+
   return (
     <>
       <Animated.View
         ref={containerRef}
         className="mb-2"
         style={animatedStyle}
-        onLayout={(e) => {
-          if (!isRemoving) {
-            currentHeightRef.current = e.nativeEvent.layout.height;
-          }
-        }}
+        onLayout={!isDeleting ? (e) => {
+          cachedHeightRef.current = e.nativeEvent.layout.height;
+        } : undefined}
       >
-        <View className="flex-row items-center">
-          {/* Bullet Icon */}
-          <View className="w-5 mr-1 items-center">
-            <Diamond
-              size={fontSize * 0.08}
-              color={iconColor}
-            fill={iconColor}
-            strokeWidth={0}
-          />
-        </View>
-
-        {/* Item Input */}
-        <View className="flex-1">
-          <TextInput
-            value={item.content}
-            onChangeText={updateContent}
-            placeholder={`${itemIndex}번째 기도제목`}
-            className="border border-gray-300 dark:border-neutral-600 rounded-lg px-3 py-2 text-gray-900 dark:text-white bg-white dark:bg-neutral-700"
-            placeholderTextColor={getThemeColor(Colors.text.placeholder, isDarkMode)}
-            style={{ fontSize: fontSize * 0.14 }}
-            multiline
-          />
-        </View>
-
-        {/* Remove Button */}
-        <TouchableOpacity
-          onPress={handleRemovePress}
-          disabled={!canRemove || isRemoving}
-          className="ml-2 p-1"
-        >
-          <Trash2
-            size={fontSize*0.14}
-            color={canRemove ? getThemeColor(Colors.status.error, isDarkMode) : getThemeColor(Colors.status.disabled, isDarkMode)}
-            strokeWidth={1.5}
-            opacity={canRemove ? 1 : 0.6}
-          />
-        </TouchableOpacity>
-        </View>
+        {content}
       </Animated.View>
 
       {/* Delete Confirmation Modal */}
@@ -234,4 +242,6 @@ export default function PrayerItemEditor({
       </Modal>
     </>
   );
-}
+});
+
+export default PrayerItemEditor;

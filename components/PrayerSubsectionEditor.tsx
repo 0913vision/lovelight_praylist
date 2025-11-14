@@ -17,13 +17,13 @@ import Animated, {
 interface PrayerSubsectionEditorProps {
   subsection: EditablePrayerSubsection;
   subsectionIndex: number;
-  onUpdate: (subsection: EditablePrayerSubsection) => void;
-  onRemove: () => void;
+  onUpdate: (subsectionId: string, subsection: EditablePrayerSubsection) => void;
+  onRemove: (subsectionId: string) => void;
   onDeleteStart?: (height: number) => void;
   onDeleteEnd?: () => void;
 }
 
-export default function PrayerSubsectionEditor({
+const PrayerSubsectionEditor = React.memo(function PrayerSubsectionEditor({
   subsection,
   subsectionIndex,
   onUpdate,
@@ -33,28 +33,36 @@ export default function PrayerSubsectionEditor({
 }: PrayerSubsectionEditorProps) {
   const { isDarkMode } = useTheme();
   const { fontSize } = useFontSize();
-  const [isRemoving, setIsRemoving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const containerRef = useRef<View>(null);
-  const currentHeightRef = useRef(0);
+  const cachedHeightRef = useRef(0);
 
   const translateX = useSharedValue(0);
   const opacity = useSharedValue(1);
   const animatedHeight = useSharedValue<number | null>(null);
   const marginTop = useSharedValue(12);
 
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: translateX.value }],
-    opacity: opacity.value,
-    height: animatedHeight.value ?? undefined,
-    marginTop: marginTop.value,
-    overflow: 'hidden',
-  }));
+  const animatedStyle = useAnimatedStyle(() => {
+    'worklet';
+    if (!isDeleting) {
+      // 평소: 애니메이션 스타일 없음 (빈 객체)
+      return {};
+    }
+    // 삭제 중: 애니메이션 스타일 적용
+    return {
+      transform: [{ translateX: translateX.value }],
+      opacity: opacity.value,
+      height: animatedHeight.value ?? undefined,
+      marginTop: marginTop.value,
+      overflow: 'hidden',
+    };
+  }, [isDeleting]);
 
   const generateItemId = () => `sub-item-${Date.now()}-${Math.random()}`;
 
   const updateSubsectionName = (name: string) => {
-    onUpdate({ ...subsection, name });
+    onUpdate(subsection.id, { ...subsection, name });
   };
 
   const addItem = () => {
@@ -64,14 +72,14 @@ export default function PrayerSubsectionEditor({
       isNew: true,
     };
 
-    onUpdate({
+    onUpdate(subsection.id, {
       ...subsection,
       items: [...subsection.items, newItem],
     });
   };
 
   const updateItem = (itemId: string, updatedItem: EditablePrayerItem) => {
-    onUpdate({
+    onUpdate(subsection.id, {
       ...subsection,
       items: subsection.items.map(item =>
         item.id === itemId ? updatedItem : item
@@ -80,7 +88,7 @@ export default function PrayerSubsectionEditor({
   };
 
   const removeItem = (itemId: string) => {
-    onUpdate({
+    onUpdate(subsection.id, {
       ...subsection,
       items: subsection.items.filter(item => item.id !== itemId),
     });
@@ -93,55 +101,55 @@ export default function PrayerSubsectionEditor({
   };
 
   const finalizeRemoval = () => {
-    onRemove();
+    onRemove(subsection.id);
     onDeleteEnd?.();
   };
 
   const startDeleteAnimation = () => {
-    // 삭제 시작 시점에 실시간으로 높이 측정
-    containerRef.current?.measure((_x, _y, _width, height) => {
-      const totalHeight = height + 12; // height + marginTop
+    // 캐시된 높이 사용 (measure 호출 제거로 딜레이 제거)
+    const height = cachedHeightRef.current;
+    const totalHeight = height + 12; // height + marginTop
 
-      // 애니메이션 시작 전 높이 고정
-      if (animatedHeight.value === null) {
-        animatedHeight.value = currentHeightRef.current || height;
-      }
+    // 높이 고정
+    animatedHeight.value = height;
 
-      // 부모에게 삭제 시작 알림
-      notifyDeleteStart(totalHeight);
+    // 부모에게 삭제 시작 알림
+    notifyDeleteStart(totalHeight);
 
-      // 통일된 타이밍: 280ms slide + 220ms collapse
-      translateX.value = withTiming(-400, {
-        duration: 280,
-        easing: Easing.bezier(0.25, 0.1, 0.25, 1),
-      });
-      opacity.value = withTiming(0, {
-        duration: 280,
-        easing: Easing.bezier(0.25, 0.1, 0.25, 1),
-      }, (finished) => {
-        if (!finished) return;
+    // Animated.View로 전환 + 즉시 애니메이션 시작
+    setIsDeleting(true);
 
-        // Height와 marginTop을 동시에 애니메이션
-        if (animatedHeight.value !== null) {
-          animatedHeight.value = withTiming(0, {
-            duration: 220,
-            easing: Easing.bezier(0.25, 0.1, 0.25, 1),
-          });
-        }
-        marginTop.value = withTiming(0, {
+    // 즉시 애니메이션 시작
+    translateX.value = withTiming(-400, {
+      duration: 280,
+      easing: Easing.bezier(0.25, 0.1, 0.25, 1),
+    });
+    opacity.value = withTiming(0, {
+      duration: 280,
+      easing: Easing.bezier(0.25, 0.1, 0.25, 1),
+    }, (finished) => {
+      if (!finished) return;
+
+      // Height와 marginTop을 동시에 애니메이션
+      if (animatedHeight.value !== null) {
+        animatedHeight.value = withTiming(0, {
           duration: 220,
           easing: Easing.bezier(0.25, 0.1, 0.25, 1),
-        }, (collapsed) => {
-          if (collapsed) {
-            runOnJS(finalizeRemoval)();
-          }
         });
+      }
+      marginTop.value = withTiming(0, {
+        duration: 220,
+        easing: Easing.bezier(0.25, 0.1, 0.25, 1),
+      }, (collapsed) => {
+        if (collapsed) {
+          runOnJS(finalizeRemoval)();
+        }
       });
     });
   };
 
   const handleRemovePress = () => {
-    if (isRemoving) return;
+    if (isDeleting) return;
 
     // 세부주제 이름과 모든 기도제목이 비어있는지 확인
     const hasName = subsection.name.trim();
@@ -149,7 +157,6 @@ export default function PrayerSubsectionEditor({
 
     // 이름도 없고 내용도 없으면 바로 삭제
     if (!hasName && !hasContent) {
-      setIsRemoving(true);
       startDeleteAnimation();
       return;
     }
@@ -160,7 +167,6 @@ export default function PrayerSubsectionEditor({
 
   const handleConfirmDelete = () => {
     setShowDeleteModal(false);
-    setIsRemoving(true);
     startDeleteAnimation();
   };
 
@@ -168,72 +174,75 @@ export default function PrayerSubsectionEditor({
     setShowDeleteModal(false);
   };
 
+  const content = (
+    <View className="border border-gray-200 dark:border-neutral-700 rounded-lg p-3 bg-white dark:bg-neutral-900">
+      <View className="flex-row items-center mb-3">
+        <TextInput
+          value={subsection.name}
+          onChangeText={updateSubsectionName}
+          placeholder={`세부 주제 ${subsectionIndex} (필수)`}
+          className="flex-1 border border-gray-300 dark:border-neutral-600 rounded-lg px-3 py-2 text-gray-900 dark:text-white bg-gray-50 dark:bg-neutral-800"
+          placeholderTextColor={getThemeColor(Colors.text.placeholder, isDarkMode)}
+          style={{ fontSize: fontSize * 0.13 }}
+        />
+        <TouchableOpacity onPress={handleRemovePress} className="ml-2 p-1" disabled={isDeleting}>
+          <Trash2
+            size={fontSize * 0.13}
+            color={getThemeColor(Colors.status.error, isDarkMode)}
+            strokeWidth={1.5}
+            opacity={isDeleting ? 0.6 : 1}
+          />
+        </TouchableOpacity>
+      </View>
+
+      <View>
+        {subsection.items.map((item, index) => (
+          <PrayerItemEditor
+            key={item.id}
+            item={item}
+            itemIndex={index + 1}
+            onUpdate={updateItem}
+            onRemove={removeItem}
+            canRemove={subsection.items.length > 1}
+            onDeleteStart={notifyDeleteStart}
+            onDeleteEnd={onDeleteEnd}
+          />
+        ))}
+
+        <TouchableOpacity
+          onPress={addItem}
+          className="rounded-lg items-center justify-center mt-2"
+          style={{
+            backgroundColor: 'transparent',
+            borderWidth: 0.8,
+            borderStyle: 'dashed',
+            borderColor: getThemeColor(Colors.border, isDarkMode),
+            borderRadius: 8,
+            paddingVertical: 8
+          }}
+        >
+          <Text
+            className="text-gray-500 dark:text-gray-400"
+            style={{ fontSize: fontSize * 0.14 }}
+          >
+            + 세부 주제 기도제목 추가
+          </Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+
   return (
     <>
       <Animated.View
         ref={containerRef}
+        className="mt-3"
         style={animatedStyle}
-        onLayout={(e) => {
-          if (!isRemoving) {
-            currentHeightRef.current = e.nativeEvent.layout.height;
-          }
-        }}
+        onLayout={!isDeleting ? (e) => {
+          cachedHeightRef.current = e.nativeEvent.layout.height;
+        } : undefined}
       >
-        <View className="border border-gray-200 dark:border-neutral-700 rounded-lg p-3 bg-white dark:bg-neutral-900">
-          <View className="flex-row items-center mb-3">
-          <TextInput
-            value={subsection.name}
-            onChangeText={updateSubsectionName}
-            placeholder={`세부 주제 ${subsectionIndex} (필수)`}
-            className="flex-1 border border-gray-300 dark:border-neutral-600 rounded-lg px-3 py-2 text-gray-900 dark:text-white bg-gray-50 dark:bg-neutral-800"
-            placeholderTextColor={getThemeColor(Colors.text.placeholder, isDarkMode)}
-            style={{ fontSize: fontSize * 0.13 }}
-          />
-          <TouchableOpacity onPress={handleRemovePress} className="ml-2 p-1" disabled={isRemoving}>
-            <Trash2
-              size={fontSize * 0.13}
-              color={getThemeColor(Colors.status.error, isDarkMode)}
-              strokeWidth={1.5}
-              opacity={isRemoving ? 0.6 : 1}
-            />
-          </TouchableOpacity>
-        </View>
-
-        <View>
-          {subsection.items.map((item, index) => (
-              <PrayerItemEditor
-                key={item.id}
-                item={item}
-                itemIndex={index + 1}
-                onUpdate={(updatedItem) => updateItem(item.id, updatedItem)}
-                onRemove={() => removeItem(item.id)}
-                canRemove={subsection.items.length > 1}
-                onDeleteStart={notifyDeleteStart}
-                onDeleteEnd={onDeleteEnd}
-              />
-            ))}
-
-          <TouchableOpacity
-            onPress={addItem}
-            className="rounded-lg items-center justify-center mt-2"
-            style={{
-              backgroundColor: 'transparent',
-              borderWidth: 0.8,
-              borderStyle: 'dashed',
-              borderColor: getThemeColor(Colors.border, isDarkMode),
-              borderRadius: 8,
-              paddingVertical: 8
-            }}
-          >
-            <Text
-              className="text-gray-500 dark:text-gray-400"
-              style={{ fontSize: fontSize * 0.14 }}
-            >
-              + 세부 주제 기도제목 추가
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </View>
+        {content}
       </Animated.View>
 
       {/* Delete Confirmation Modal */}
@@ -289,4 +298,6 @@ export default function PrayerSubsectionEditor({
       </Modal>
     </>
   );
-}
+});
+
+export default PrayerSubsectionEditor;

@@ -19,14 +19,14 @@ import { Colors, getThemeColor } from '../constants/Colors';
 interface PrayerSectionEditorProps {
   section: EditablePrayerSection;
   sectionIndex: number;
-  onUpdate: (section: EditablePrayerSection) => void;
-  onRemove: () => void;
+  onUpdate: (sectionId: string, section: EditablePrayerSection) => void;
+  onRemove: (sectionId: string) => void;
   canRemove: boolean;
   onDeleteStart?: (height: number) => void;
   onDeleteEnd?: () => void;
 }
 
-export default function PrayerSectionEditor({
+const PrayerSectionEditor = React.memo(function PrayerSectionEditor({
   section,
   sectionIndex,
   onUpdate,
@@ -38,9 +38,9 @@ export default function PrayerSectionEditor({
   const { isDarkMode } = useTheme();
   const { fontSize } = useFontSize();
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const containerRef = useRef<View>(null);
-  const currentHeightRef = useRef(0);
-  const isDeletingRef = useRef(false);
+  const cachedHeightRef = useRef(0);
 
   // Reanimated shared values
   const translateX = useSharedValue(0);
@@ -52,7 +52,7 @@ export default function PrayerSectionEditor({
   const generateSubsectionId = () => `subsection-${Date.now()}-${Math.random()}`;
 
   const updateSectionName = (name: string) => {
-    onUpdate({ ...section, name });
+    onUpdate(section.id, { ...section, name });
   };
 
   const addItem = () => {
@@ -62,7 +62,7 @@ export default function PrayerSectionEditor({
       isNew: true,
     };
 
-    onUpdate({
+    onUpdate(section.id, {
       ...section,
       items: [...section.items, newItem],
     });
@@ -76,21 +76,21 @@ export default function PrayerSectionEditor({
       isNew: true,
     };
 
-    onUpdate({
+    onUpdate(section.id, {
       ...section,
       subsections: [...(section.subsections ?? []), newSubsection],
     });
   };
 
   const removeSubsection = (subsectionId: string) => {
-    onUpdate({
+    onUpdate(section.id, {
       ...section,
       subsections: (section.subsections ?? []).filter(subsection => subsection.id !== subsectionId),
     });
   };
 
   const updateSubsection = (subsectionId: string, updatedSubsection: EditablePrayerSubsection) => {
-    onUpdate({
+    onUpdate(section.id, {
       ...section,
       subsections: (section.subsections ?? []).map(subsection =>
         subsection.id === subsectionId ? updatedSubsection : subsection
@@ -99,14 +99,14 @@ export default function PrayerSectionEditor({
   };
 
   const removeItem = (itemId: string) => {
-    onUpdate({
+    onUpdate(section.id, {
       ...section,
       items: section.items.filter(item => item.id !== itemId),
     });
   };
 
   const updateItem = (itemId: string, updatedItem: EditablePrayerItem) => {
-    onUpdate({
+    onUpdate(section.id, {
       ...section,
       items: section.items.map(item =>
         item.id === itemId ? updatedItem : item
@@ -121,53 +121,51 @@ export default function PrayerSectionEditor({
   };
 
   const finalizeRemoval = () => {
-    onRemove();
+    onRemove(section.id);
     onDeleteEnd?.();
   };
 
   const startDeleteAnimation = () => {
-    isDeletingRef.current = true;
+    // 캐시된 높이 사용 (measure 호출 제거로 딜레이 제거)
+    const height = cachedHeightRef.current;
+    const totalHeight = height + 24; // height + marginBottom
 
-    // 삭제 시작 시점에 실시간으로 높이 측정
-    containerRef.current?.measure((_x, _y, _width, height) => {
-      const totalHeight = height + 24; // height + marginBottom
+    // 높이 고정
+    animatedHeight.value = height;
 
-      // 애니메이션 시작 전 높이 고정
-      if (animatedHeight.value === null) {
-        animatedHeight.value = currentHeightRef.current || height;
-      }
+    // 부모에게 삭제 시작 알림
+    onDeleteStart?.(totalHeight);
 
-      // 부모에게 삭제 시작 알림
-      onDeleteStart?.(totalHeight);
+    // Animated.View로 전환 + 즉시 애니메이션 시작
+    setIsDeleting(true);
 
-      // 통일된 타이밍: 280ms slide + 220ms collapse
-      translateX.value = withTiming(-400, {
-        duration: 280,
-        easing: Easing.bezier(0.25, 0.1, 0.25, 1)
-      });
-      opacity.value = withTiming(0, {
-        duration: 280,
-        easing: Easing.bezier(0.25, 0.1, 0.25, 1)
-      }, (finished) => {
-        if (finished) {
-          // Step 2: Collapse height and margin smoothly
-          if (animatedHeight.value !== null) {
-            animatedHeight.value = withTiming(0, {
-              duration: 220,
-              easing: Easing.bezier(0.25, 0.1, 0.25, 1)
-            });
-          }
-          marginBottom.value = withTiming(0, {
+    // 즉시 애니메이션 시작
+    translateX.value = withTiming(-400, {
+      duration: 280,
+      easing: Easing.bezier(0.25, 0.1, 0.25, 1)
+    });
+    opacity.value = withTiming(0, {
+      duration: 280,
+      easing: Easing.bezier(0.25, 0.1, 0.25, 1)
+    }, (finished) => {
+      if (finished) {
+        // Step 2: Collapse height and margin smoothly
+        if (animatedHeight.value !== null) {
+          animatedHeight.value = withTiming(0, {
             duration: 220,
             easing: Easing.bezier(0.25, 0.1, 0.25, 1)
-          }, (finished) => {
-            if (finished) {
-              // Step 3: Trigger removal on JS thread
-              runOnJS(finalizeRemoval)();
-            }
           });
         }
-      });
+        marginBottom.value = withTiming(0, {
+          duration: 220,
+          easing: Easing.bezier(0.25, 0.1, 0.25, 1)
+        }, (finished) => {
+          if (finished) {
+            // Step 3: Trigger removal on JS thread
+            runOnJS(finalizeRemoval)();
+          }
+        });
+      }
     });
   };
 
@@ -198,30 +196,28 @@ export default function PrayerSectionEditor({
     startDeleteAnimation();
   };
 
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: translateX.value }],
-    opacity: opacity.value,
-    height: animatedHeight.value !== null ? animatedHeight.value : undefined,
-    marginBottom: marginBottom.value,
-    overflow: 'hidden',
-  }));
+  const animatedStyle = useAnimatedStyle(() => {
+    'worklet';
+    if (!isDeleting) {
+      // 평소: 애니메이션 스타일 없음 (빈 객체)
+      return {};
+    }
+    // 삭제 중: 애니메이션 스타일 적용
+    return {
+      transform: [{ translateX: translateX.value }],
+      opacity: opacity.value,
+      height: animatedHeight.value !== null ? animatedHeight.value : undefined,
+      marginBottom: marginBottom.value,
+      overflow: 'hidden',
+    };
+  }, [isDeleting]);
 
   const handleCancelDelete = () => {
     setShowDeleteModal(false);
   };
 
-  return (
-    <>
-      <Animated.View
-        ref={containerRef}
-        style={animatedStyle}
-        onLayout={(e) => {
-          if (!isDeletingRef.current) {
-            currentHeightRef.current = e.nativeEvent.layout.height;
-          }
-        }}
-      >
-        <View className="border border-gray-200 dark:border-neutral-700 rounded-lg p-4 bg-gray-100 dark:bg-neutral-800">
+  const content = (
+    <View className="border border-gray-200 dark:border-neutral-700 rounded-lg p-4 bg-gray-100 dark:bg-neutral-800">
           {/* Section Name Input with Trash Icon */}
           <View className="flex-row items-center mb-3">
             <TextInput
@@ -259,13 +255,13 @@ export default function PrayerSectionEditor({
                 key={item.id}
                 item={item}
                 itemIndex={index + 1}
-                onUpdate={(updatedItem) => updateItem(item.id, updatedItem)}
-              onRemove={() => removeItem(item.id)}
-              canRemove={section.items.length > 0}
-              onDeleteStart={notifyChildDeleteStart}
-              onDeleteEnd={onDeleteEnd}
-            />
-          ))}
+                onUpdate={updateItem}
+                onRemove={removeItem}
+                canRemove={section.items.length > 0}
+                onDeleteStart={notifyChildDeleteStart}
+                onDeleteEnd={onDeleteEnd}
+              />
+            ))}
 
             {/* Add Item Button */}
             <TouchableOpacity
@@ -304,8 +300,8 @@ export default function PrayerSectionEditor({
                   key={subsection.id}
                   subsection={subsection}
                   subsectionIndex={idx + 1}
-                  onUpdate={(updated) => updateSubsection(subsection.id, updated)}
-                  onRemove={() => removeSubsection(subsection.id)}
+                  onUpdate={updateSubsection}
+                  onRemove={removeSubsection}
                   onDeleteStart={notifyChildDeleteStart}
                   onDeleteEnd={onDeleteEnd}
                 />
@@ -333,6 +329,19 @@ export default function PrayerSectionEditor({
             </TouchableOpacity>
           </View>
         </View>
+  );
+
+  return (
+    <>
+      <Animated.View
+        ref={containerRef}
+        className="mb-6"
+        style={animatedStyle}
+        onLayout={!isDeleting ? (e) => {
+          cachedHeightRef.current = e.nativeEvent.layout.height;
+        } : undefined}
+      >
+        {content}
       </Animated.View>
 
       {/* Delete Confirmation Modal */}
@@ -388,4 +397,6 @@ export default function PrayerSectionEditor({
       </Modal>
     </>
   );
-}
+});
+
+export default PrayerSectionEditor;

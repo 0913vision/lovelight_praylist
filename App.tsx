@@ -1,8 +1,8 @@
 import React from 'react';
-import { View, Text } from 'react-native';
+import { View, Text, Platform } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { NavigationContainer } from '@react-navigation/native';
-import { createStackNavigator } from '@react-navigation/stack';
+import { createStackNavigator, CardStyleInterpolators, TransitionSpecs } from '@react-navigation/stack';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 import Toast from 'react-native-toast-message';
@@ -126,7 +126,14 @@ function AppContent() {
                       name="Edit"
                       component={EditScreen}
                       options={{
-                        presentation: 'modal',
+                        presentation: 'card',
+                        cardStyleInterpolator: CardStyleInterpolators.forHorizontalIOS,
+                        transitionSpec: {
+                          open: TransitionSpecs.TransitionIOSSpec,
+                          close: TransitionSpecs.TransitionIOSSpec,
+                        },
+                        gestureEnabled: true,
+                        gestureDirection: 'horizontal-inverted',
                       }}
                     />
                   </Stack.Navigator>
