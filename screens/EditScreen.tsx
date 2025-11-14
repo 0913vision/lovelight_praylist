@@ -6,11 +6,9 @@ import {
   TouchableOpacity,
   Platform,
   ScrollView,
-  Modal,
   ActivityIndicator,
   DeviceEventEmitter,
   BackHandler,
-  Animated,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
@@ -27,6 +25,7 @@ import { usePrayers, PrayerData } from '../hooks/usePrayers';
 import { EditablePrayerData, EditablePrayerSection, EditablePrayerSubsection } from '../types';
 import PrayerSectionEditor from '../components/PrayerSectionEditor';
 import DateSelector from '../components/DateSelector';
+import AnimatedModal from '../components/AnimatedModal';
 import { Colors, getThemeColor } from '../constants/Colors';
 
 type EditScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Edit'>;
@@ -56,8 +55,6 @@ export default function EditScreen({ navigation, initialData }: EditScreenProps)
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const pendingDeleteLocksRef = useRef(0);
-
-  const modalOpacity = useRef(new Animated.Value(0)).current;
 
   // 편집 모드 진입/나갈 때 음악 상태 관리
   useEffect(() => {
@@ -113,8 +110,6 @@ export default function EditScreen({ navigation, initialData }: EditScreenProps)
   });
 
   const generateSectionId = () => `section-${Date.now()}-${Math.random()}`;
-  const generateItemId = () => `item-${Date.now()}-${Math.random()}`;
-  const generateSubsectionId = () => `subsection-${Date.now()}-${Math.random()}`;
 
   // PrayerData를 EditablePrayerData로 변환
   const convertToEditableData = (data: PrayerData): EditablePrayerData => {
@@ -204,19 +199,6 @@ export default function EditScreen({ navigation, initialData }: EditScreenProps)
   const showError = (message: string) => {
     setErrorMessage(message);
     setShowErrorModal(true);
-    Animated.timing(modalOpacity, {
-      toValue: 1,
-      duration: 150,
-      useNativeDriver: true,
-    }).start();
-  };
-
-  const hideModal = (closeFunction: () => void) => {
-    Animated.timing(modalOpacity, {
-      toValue: 0,
-      duration: 100,
-      useNativeDriver: true,
-    }).start(() => closeFunction());
   };
 
   const validateData = (): boolean => {
@@ -267,11 +249,6 @@ export default function EditScreen({ navigation, initialData }: EditScreenProps)
 
     setSaveTitle(autoTitle);
     setShowSaveModal(true);
-    Animated.timing(modalOpacity, {
-      toValue: 1,
-      duration: 150,
-      useNativeDriver: true,
-    }).start();
   };
 
   const handleConfirmSave = async () => {
@@ -366,25 +343,18 @@ export default function EditScreen({ navigation, initialData }: EditScreenProps)
   const handleCancel = () => {
     if (hasChanges) {
       setShowExitModal(true);
-      Animated.timing(modalOpacity, {
-        toValue: 1,
-        duration: 150,
-        useNativeDriver: true,
-      }).start();
     } else {
       navigation.goBack();
     }
   };
 
   const handleConfirmExit = () => {
-    hideModal(() => {
-      setShowExitModal(false);
-      navigation.goBack();
-    });
+    setShowExitModal(false);
+    navigation.goBack();
   };
 
   const handleCancelExit = () => {
-    hideModal(() => setShowExitModal(false));
+    setShowExitModal(false);
   };
 
   const handleLoadData = async () => {
@@ -451,14 +421,7 @@ export default function EditScreen({ navigation, initialData }: EditScreenProps)
               <ChevronLeft className="w-6 h-6" color={getThemeColor(Colors.primary, isDarkMode)} />
             </TouchableOpacity>
             <TouchableOpacity
-              onPress={() => {
-                setShowLoadModal(true);
-                Animated.timing(modalOpacity, {
-                  toValue: 1,
-                  duration: 150,
-                  useNativeDriver: true,
-                }).start();
-              }}
+              onPress={() => setShowLoadModal(true)}
               className="rounded-lg"
             >
               <Download className="w-6 h-6" color={getThemeColor(Colors.primary, isDarkMode)} />
@@ -574,14 +537,11 @@ export default function EditScreen({ navigation, initialData }: EditScreenProps)
       </KeyboardAwareScrollView>
 
       {/* Save Confirmation Modal */}
-      <Modal
+      <AnimatedModal
         visible={showSaveModal}
-        transparent={true}
-        animationType="none"
-        onRequestClose={() => !isSaving && hideModal(() => setShowSaveModal(false))}
+        onRequestClose={() => !isSaving && setShowSaveModal(false)}
       >
-        <Animated.View style={{ flex: 1, opacity: modalOpacity }} className="justify-center items-center bg-black/50">
-          <View className="bg-white dark:bg-neutral-800 rounded-2xl p-6 w-4/5 max-w-sm shadow-2xl">
+        <View className="bg-white dark:bg-neutral-800 rounded-2xl p-6 w-4/5 max-w-sm shadow-2xl">
             {isSaving ? (
               <>
                 <Text
@@ -630,7 +590,7 @@ export default function EditScreen({ navigation, initialData }: EditScreenProps)
 
                 <View className="flex-row gap-3">
                   <TouchableOpacity
-                    onPress={() => hideModal(() => setShowSaveModal(false))}
+                    onPress={() => setShowSaveModal(false)}
                     className="flex-1 bg-gray-200 dark:bg-neutral-700 rounded-lg py-3"
                   >
                     <Text
@@ -660,18 +620,14 @@ export default function EditScreen({ navigation, initialData }: EditScreenProps)
               </>
             )}
           </View>
-        </Animated.View>
-      </Modal>
+      </AnimatedModal>
 
       {/* Load Confirmation Modal */}
-      <Modal
+      <AnimatedModal
         visible={showLoadModal}
-        transparent={true}
-        animationType="none"
-        onRequestClose={() => !isLoadingData && hideModal(() => setShowLoadModal(false))}
+        onRequestClose={() => !isLoadingData && setShowLoadModal(false)}
       >
-        <Animated.View style={{ flex: 1, opacity: modalOpacity }} className="justify-center items-center bg-black/50">
-          <View className="bg-white dark:bg-neutral-800 rounded-2xl p-6 w-4/5 max-w-sm shadow-2xl">
+        <View className="bg-white dark:bg-neutral-800 rounded-2xl p-6 w-4/5 max-w-sm shadow-2xl">
             {isLoadingData ? (
               <>
                 <Text
@@ -743,7 +699,7 @@ export default function EditScreen({ navigation, initialData }: EditScreenProps)
 
                 <View className="flex-row gap-3">
                   <TouchableOpacity
-                    onPress={() => hideModal(() => setShowLoadModal(false))}
+                    onPress={() => setShowLoadModal(false)}
                     className="flex-1 bg-gray-200 dark:bg-neutral-700 rounded-lg py-3"
                   >
                     <Text
@@ -773,18 +729,14 @@ export default function EditScreen({ navigation, initialData }: EditScreenProps)
               </>
             )}
           </View>
-        </Animated.View>
-      </Modal>
+      </AnimatedModal>
 
       {/* Exit Confirmation Modal */}
-      <Modal
+      <AnimatedModal
         visible={showExitModal}
-        transparent={true}
-        animationType="none"
         onRequestClose={handleCancelExit}
       >
-        <Animated.View style={{ flex: 1, opacity: modalOpacity }} className="justify-center items-center bg-black/50">
-          <View className="bg-white dark:bg-neutral-800 rounded-2xl p-6 w-4/5 max-w-sm shadow-2xl">
+        <View className="bg-white dark:bg-neutral-800 rounded-2xl p-6 w-4/5 max-w-sm shadow-2xl">
             <Text
               className="text-gray-900 dark:text-white font-semibold mb-3 text-center"
               style={{ fontSize: fontSize * 0.16 }}
@@ -842,18 +794,14 @@ export default function EditScreen({ navigation, initialData }: EditScreenProps)
               </TouchableOpacity>
             </View>
           </View>
-        </Animated.View>
-      </Modal>
+      </AnimatedModal>
 
       {/* Error Modal */}
-      <Modal
+      <AnimatedModal
         visible={showErrorModal}
-        transparent={true}
-        animationType="none"
-        onRequestClose={() => hideModal(() => setShowErrorModal(false))}
+        onRequestClose={() => setShowErrorModal(false)}
       >
-        <Animated.View style={{ flex: 1, opacity: modalOpacity }} className="justify-center items-center bg-black/50">
-          <View className="bg-white dark:bg-neutral-800 rounded-2xl p-6 w-4/5 max-w-sm shadow-2xl">
+        <View className="bg-white dark:bg-neutral-800 rounded-2xl p-6 w-4/5 max-w-sm shadow-2xl">
             <Text
               className="text-gray-900 dark:text-white font-semibold mb-3 text-center"
               style={{ fontSize: fontSize * 0.16 }}
@@ -875,7 +823,7 @@ export default function EditScreen({ navigation, initialData }: EditScreenProps)
             </View>
 
             <TouchableOpacity
-              onPress={() => hideModal(() => setShowErrorModal(false))}
+              onPress={() => setShowErrorModal(false)}
               className="rounded-lg py-3"
               style={{ backgroundColor: getThemeColor(Colors.button.background, isDarkMode) }}
             >
@@ -890,8 +838,7 @@ export default function EditScreen({ navigation, initialData }: EditScreenProps)
               </Text>
             </TouchableOpacity>
           </View>
-        </Animated.View>
-      </Modal>
+      </AnimatedModal>
     </SafeAreaView>
   );
 }

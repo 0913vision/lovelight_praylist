@@ -1,5 +1,6 @@
 import React, { useRef, useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, Modal } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity } from 'react-native';
+import AnimatedModal from './AnimatedModal';
 import { Trash2, Diamond } from 'lucide-react-native';
 import { EditablePrayerItem } from '../types';
 import { useFontSize } from '../contexts/FontSizeContext';
@@ -191,55 +192,51 @@ const PrayerItemEditor = React.memo(function PrayerItemEditor({
       </Animated.View>
 
       {/* Delete Confirmation Modal */}
-      <Modal
+      <AnimatedModal
         visible={showDeleteModal}
-        transparent={true}
-        animationType="fade"
         onRequestClose={handleCancelDelete}
       >
-        <View className="flex-1 justify-center items-center bg-black/50">
-          <View className="bg-white dark:bg-neutral-800 rounded-2xl p-6 w-4/5 max-w-sm shadow-2xl">
-            <Text
-              className="text-gray-900 dark:text-white font-semibold mb-3 text-center"
-              style={{ fontSize: fontSize * 0.16 }}
-            >
-              기도제목 삭제
-            </Text>
-            <Text
-              className="text-gray-600 dark:text-gray-400 mb-6 text-center"
-              style={{ fontSize: fontSize * 0.13 }}
-            >
-              이 기도제목을 삭제할까요?
-            </Text>
+        <View className="bg-white dark:bg-neutral-800 rounded-2xl p-6 w-4/5 max-w-sm shadow-2xl">
+          <Text
+            className="text-gray-900 dark:text-white font-semibold mb-3 text-center"
+            style={{ fontSize: fontSize * 0.16 }}
+          >
+            기도제목 삭제
+          </Text>
+          <Text
+            className="text-gray-600 dark:text-gray-400 mb-6 text-center"
+            style={{ fontSize: fontSize * 0.13 }}
+          >
+            이 기도제목을 삭제할까요?
+          </Text>
 
-            <View className="flex-row gap-3">
-              <TouchableOpacity
-                onPress={handleCancelDelete}
-                className="flex-1 bg-gray-200 dark:bg-neutral-700 rounded-lg py-3"
+          <View className="flex-row gap-3">
+            <TouchableOpacity
+              onPress={handleCancelDelete}
+              className="flex-1 bg-gray-200 dark:bg-neutral-700 rounded-lg py-3"
+            >
+              <Text
+                className="text-gray-800 dark:text-gray-200 text-center font-medium"
+                style={{ fontSize: fontSize * 0.14 }}
               >
-                <Text
-                  className="text-gray-800 dark:text-gray-200 text-center font-medium"
-                  style={{ fontSize: fontSize * 0.14 }}
-                >
-                  취소
-                </Text>
-              </TouchableOpacity>
+                취소
+              </Text>
+            </TouchableOpacity>
 
-              <TouchableOpacity
-                onPress={handleConfirmDelete}
-                className="flex-1 bg-red-500 dark:bg-red-600 rounded-lg py-3"
+            <TouchableOpacity
+              onPress={handleConfirmDelete}
+              className="flex-1 bg-red-500 dark:bg-red-600 rounded-lg py-3"
+            >
+              <Text
+                className="text-white text-center font-semibold"
+                style={{ fontSize: fontSize * 0.14 }}
               >
-                <Text
-                  className="text-white text-center font-semibold"
-                  style={{ fontSize: fontSize * 0.14 }}
-                >
-                  삭제
-                </Text>
-              </TouchableOpacity>
-            </View>
+                삭제
+              </Text>
+            </TouchableOpacity>
           </View>
         </View>
-      </Modal>
+      </AnimatedModal>
     </>
   );
 });
