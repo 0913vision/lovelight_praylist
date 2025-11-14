@@ -574,18 +574,29 @@ export default function EditScreen({ navigation, initialData }: EditScreenProps)
                     다음 제목으로 저장하시겠습니까?
                   </WrappedText>
                 </View>
-                <View className="mb-6">
-                  <WrappedText
-                    containerStyle={{ alignItems: 'center', alignSelf: 'center' }}
-                    rowWrapperStyle={{ justifyContent: 'center' }}
-                    textStyle={{
-                      fontSize: fontSize * 0.15,
-                      color: colorScheme === 'dark' ? '#ffffff' : '#111827',
-                      fontWeight: '600',
+                <View className="px-4" style={{ marginTop: 12, marginBottom: 24 }}>
+                  <View
+                    style={{
+                      backgroundColor: getThemeColor(
+                        Colors.progress.background,
+                        colorScheme === 'dark'
+                      ),
+                      borderRadius: 12,
+                      padding: 16,
                     }}
                   >
-                    "{saveTitle}"
-                  </WrappedText>
+                    <WrappedText
+                      containerStyle={{ alignItems: 'center', alignSelf: 'center' }}
+                      rowWrapperStyle={{ justifyContent: 'center' }}
+                      textStyle={{
+                        fontSize: fontSize * 0.15,
+                        color: getThemeColor(Colors.text.primary, colorScheme === 'dark'),
+                        fontWeight: '600',
+                      }}
+                    >
+                      {saveTitle}
+                    </WrappedText>
+                  </View>
                 </View>
 
                 <View className="flex-row gap-3">
