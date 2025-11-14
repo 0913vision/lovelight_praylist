@@ -22,9 +22,17 @@ export default function PrayerDisplay({ title, sections, verse }: PrayerDisplayP
 
   return (
     <View className="space-y-8">
-      <Text className="font-semibold text-gray-900 dark:text-white" style={getTitleStyle()}>
-        {title}
-      </Text>
+      <WrappedText
+        containerStyle={{ alignItems: 'flex-start', alignSelf: 'flex-start' }}
+        rowWrapperStyle={{ justifyContent: 'flex-start' }}
+        textStyle={{
+          ...getTitleStyle(),
+          color: colorScheme === 'dark' ? '#ffffff' : '#111827',
+          fontWeight: '600',
+        }}
+      >
+        {title as any}
+      </WrappedText>
 
       {sections.map((section, index) => (
         <View key={`${section.name}-${index}`} className="space-y-3 mt-6">
